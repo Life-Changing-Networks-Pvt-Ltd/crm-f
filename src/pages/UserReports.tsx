@@ -3,13 +3,10 @@ import { PageHeader } from "@/components/layout/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Loader2, Users as UsersIcon, UserPlus, ShieldAlert, Filter, RefreshCcw } from "lucide-react"
 import api from "@/services/api"
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#a28CFE', '#FF6666'];
 
 export default function UserReports() {
   const [users, setUsers] = useState<any[]>([])
@@ -96,7 +93,6 @@ export default function UserReports() {
     const role = u.role || 'Unassigned';
     roleCount[role] = (roleCount[role] || 0) + 1;
   });
-  const roleData = Object.keys(roleCount).map(key => ({ name: key, value: roleCount[key] }));
 
   // Calculate users created over time (by month-year)
   const dateCount: Record<string, number> = {};
@@ -107,7 +103,6 @@ export default function UserReports() {
       dateCount[monthYear] = (dateCount[monthYear] || 0) + 1;
     }
   });
-  const trendData = Object.keys(dateCount).map(key => ({ name: key, users: dateCount[key] }));
 
   const currentMonthYear = new Date().toLocaleString('default', { month: 'short', year: 'numeric' });
   const newUsersThisMonth = dateCount[currentMonthYear] || 0;

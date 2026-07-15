@@ -227,7 +227,6 @@ export default function PageAccess() {
               {Object.entries(groupedPages).map(([category, pages]) => {
                 const categoryPages = pages.map(p => p.id)
                 const allSelected = categoryPages.every(id => permissions.includes(id))
-                const someSelected = categoryPages.some(id => permissions.includes(id)) && !allSelected
 
                 return (
                   <div key={category} className="rounded-xl border bg-card overflow-hidden shadow-sm">

@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { User, Plus, Pencil, Trash2, Loader2, ShieldAlert, Eye, EyeOff } from "lucide-react"
+import { User, Plus, Pencil, Trash2, Loader2, Eye, EyeOff } from "lucide-react"
 import api from "../services/api"
 import Swal from "sweetalert2"
 import {

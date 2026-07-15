@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Users, DollarSign, Activity, ArrowUpRight, Loader2 } from "lucide-react"
+import { Activity, Loader2 } from "lucide-react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import api from "../services/api"
@@ -24,7 +24,6 @@ interface DashboardMetrics {
 
 export default function Dashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
-  const [activities, setActivities] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -32,7 +31,6 @@ export default function Dashboard() {
       try {
         const res = await api.get('/dashboard')
         setMetrics(res.data.data.metrics)
-        setActivities(res.data.data.recentActivities)
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error)
       } finally {
