@@ -11,7 +11,7 @@ const getBaseUrl = () => {
   if (import.meta.env.PROD) {
     // If you are proxying /api through Nginx on the same domain, use '/api'.
     // If your backend is hosted separately (e.g. api.sellerslogin.com), put that URL here.
-    return 'https://api.sellerslogin.com/api'; 
+    return 'https://crmapi.sellerslogin.com/api'; 
   }
   return 'http://localhost:8080/api';
 };
