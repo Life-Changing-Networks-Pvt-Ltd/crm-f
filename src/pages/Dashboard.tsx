@@ -103,7 +103,6 @@ export default function Dashboard() {
         <PageHeader
           title="Pipeline Overview"
           description="Monitor the real-time status of all your Customers and Companies."
-          className="pb-0"
         />
         
         <div className="flex items-center gap-2">

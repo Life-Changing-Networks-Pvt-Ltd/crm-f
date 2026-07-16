@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react"
-import { Bell, Info, CheckCircle, AlertTriangle, XCircle, Trash2 } from "lucide-react"
+import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 import api from "@/services/api"
-import { toast } from "sonner"
+// import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"

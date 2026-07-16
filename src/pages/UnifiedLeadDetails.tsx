@@ -4,14 +4,14 @@ import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2, Send, MessageSquare, Paperclip, X, Image as ImageIcon } from "lucide-react"
+import { ArrowLeft, Loader2, Send, MessageSquare, Paperclip, X } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import api from "@/services/api"
 import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
+
 
 export default function UnifiedLeadDetails() {
   const { type, id } = useParams({ strict: false }) as any
@@ -162,7 +162,6 @@ export default function UnifiedLeadDetails() {
         </Button>
         <PageHeader 
           title={<span className="cursor-pointer hover:underline text-primary" onClick={() => setModalOpen(true)}>{name}</span>} 
-          className="pb-0 mb-0 border-0 flex-1"
         />
       </div>
 

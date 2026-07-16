@@ -43,7 +43,7 @@ export function GlobalStickyNotes() {
     };
   }, []);
 
-  const handleDragEnd = async (e: any, info: any, note: Note) => {
+  const handleDragEnd = async (_e: any, info: any, note: Note) => {
     // Only update if moved significantly
     if (Math.abs(info.offset.x) > 2 || Math.abs(info.offset.y) > 2) {
       let newX = note.positionX + info.offset.x;

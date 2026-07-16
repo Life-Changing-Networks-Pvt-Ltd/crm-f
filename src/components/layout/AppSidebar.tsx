@@ -3,10 +3,7 @@ import {
   Users,
   Building2,
   Contact2,
-  BadgeDollarSign,
-  KanbanSquare,
   FileText,
-  Receipt,
   Megaphone,
   Mail,
   MessageSquare,
@@ -24,8 +21,6 @@ import {
   Shield,
   Users2,
   Bell,
-  Link,
-  History,
 } from "lucide-react"
 
 import {

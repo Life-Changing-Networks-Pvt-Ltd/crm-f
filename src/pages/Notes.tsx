@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
-import { Plus, Loader2, Trash2, Pin, PinOff } from "lucide-react"
+import { Plus, Loader2, Trash2, Pin } from "lucide-react"
 import api from "@/services/api"
 import { toast } from "sonner"
 import Swal from "sweetalert2"
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { motion } from "framer-motion"
+
 
 interface Note {
   _id: string;

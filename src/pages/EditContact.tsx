@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
-import { Loader2, ArrowLeft, Users, Contact, CreditCard } from "lucide-react"
+import { Loader2, ArrowLeft, Users, Contact } from "lucide-react"
 import api from "@/services/api"
 import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
@@ -42,10 +42,9 @@ export default function EditContact() {
         name: data.name || '',
         email: data.email || '',
         phone: data.phone || '',
-        company: data.company || '',
-        address: data.address || '',
+        companyName: data.companyName || '',
+        designation: data.designation || '',
         status: data.status || 'Active',
-        totalSpend: data.totalSpend || 0
       })
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to load contact details")
