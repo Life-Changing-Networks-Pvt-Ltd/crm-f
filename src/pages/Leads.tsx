@@ -60,7 +60,15 @@ export default function Leads() {
       {/* Metrics Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat, i) => (
-          <Card key={i} className="shadow-sm border-muted/60 transition-all hover:shadow-md">
+          <Card 
+            key={i} 
+            className={`shadow-sm border-muted/60 transition-all hover:shadow-md ${stat.title === "Total Leads" ? "cursor-pointer hover:border-primary/50" : ""}`}
+            onClick={() => {
+              if (stat.title === "Total Leads") {
+                navigate({ to: '/leads/all' });
+              }
+            }}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 {stat.title}

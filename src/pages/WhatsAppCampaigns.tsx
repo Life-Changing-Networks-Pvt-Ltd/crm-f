@@ -1,21 +1,15 @@
 import { PageHeader } from "@/components/layout/PageHeader"
 import { EmptyState } from "@/components/layout/EmptyState"
-import { Button } from "@/components/ui/button"
-import { Plus } from "lucide-react"
+import { MessageSquare } from "lucide-react"
 
 export default function WhatsAppCampaigns() {
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="WhatsAppCampaigns" description="Manage WhatsApp campaigns.">
-        <Button>
-          <Plus className="mr-2 h-4 w-4" /> Add New
-        </Button>
-      </PageHeader>
+      <PageHeader title="WhatsApp Marketing" description="Manage your WhatsApp campaigns." />
       <EmptyState
-        title="No whatsappcampaigns found"
-        description="Get started by creating a new one."
-        actionLabel="Create WhatsAppCampaigns"
-        onAction={() => {}}
+        title="Coming Soon"
+        description="This feature is currently under development."
+        icon={<MessageSquare className="h-10 w-10 text-muted-foreground" />}
       />
     </div>
   )

@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react"
+import { useSelector } from "react-redux"
+import { useNavigate } from "@tanstack/react-router"
+import type { RootState } from "@/store"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -49,12 +52,15 @@ interface RoleData {
 }
 
 export default function Users() {
+  const navigate = useNavigate()
   const [users, setUsers] = useState<UserData[]>([])
   const [roles, setRoles] = useState<RoleData[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
+  
+  const { user: currentUser } = useSelector((state: RootState) => state.auth)
   
   // Form State
   const [name, setName] = useState("")
@@ -64,8 +70,13 @@ export default function Users() {
   const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
+    if (!currentUser) return; // Wait for hydration
+    if (currentUser.role !== 'admin') {
+      navigate({ to: '/' })
+      return
+    }
     fetchData()
-  }, [])
+  }, [currentUser])
 
   const fetchData = async () => {
     try {
@@ -211,15 +222,16 @@ export default function Users() {
           title="Users Management" 
           description="Manage your team members and assign roles." 
         />
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="shrink-0 gap-2" onClick={openCreateDialog}>
-              <Plus className="h-4 w-4" />
-              Add New User
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
+        {currentUser?.role === 'admin' && (
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="shrink-0 gap-2" onClick={openCreateDialog}>
+                <Plus className="h-4 w-4" />
+                Add New User
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
               <DialogTitle>{editingUserId ? 'Edit User' : 'Create New User'}</DialogTitle>
               <DialogDescription>
                 {editingUserId 
@@ -296,6 +308,7 @@ export default function Users() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        )}
       </div>
 
       <div className="rounded-md border bg-card">
@@ -353,25 +366,29 @@ export default function Users() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => openEditDialog(u)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDeleteUser(u._id)}
-                        disabled={u.role === 'admin'}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {currentUser?.role === 'admin' ? (
+                      <div className="flex items-center justify-end gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => openEditDialog(u)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteUser(u._id)}
+                          disabled={u.role === 'admin'}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground text-xs italic">No access</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))

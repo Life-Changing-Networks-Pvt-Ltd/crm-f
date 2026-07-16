@@ -2,6 +2,7 @@ import { Outlet } from "@tanstack/react-router"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "./AppSidebar"
 import { AppNavbar } from "./AppNavbar"
+import { GlobalStickyNotes } from "../shared/GlobalStickyNotes"
 
 export function AppShell() {
   return (
@@ -15,6 +16,7 @@ export function AppShell() {
           </main>
         </div>
       </div>
+      <GlobalStickyNotes />
     </SidebarProvider>
   )
 }

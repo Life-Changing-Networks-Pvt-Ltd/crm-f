@@ -5,15 +5,7 @@ import { logoutUser } from '../store/slices/authSlice';
 // Determine the base URL based on environment
 // For production, it will look for VITE_API_URL, then fallback to a generic api subdomain or relative path.
 const getBaseUrl = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-  if (import.meta.env.PROD) {
-    // If you are proxying /api through Nginx on the same domain, use '/api'.
-    // If your backend is hosted separately (e.g. api.sellerslogin.com), put that URL here.
-    return 'https://crmapi.sellerslogin.com/api'; 
-  }
-  return 'http://localhost:8080/api';
+  return import.meta.env.VITE_API_URL || '';
 };
 
 const api = axios.create({

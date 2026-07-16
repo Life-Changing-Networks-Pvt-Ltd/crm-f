@@ -5,6 +5,8 @@ import { AppShell } from '../components/layout/AppShell';
 
 // Import all pages
 import Leads from '../pages/Leads';
+import AllLeads from '../pages/AllLeads';
+import UnifiedLeadDetails from '../pages/UnifiedLeadDetails';
 import Customers from '../pages/Customers';
 import Companies from '../pages/Companies';
 import CreateCompany from '../pages/CreateCompany';
@@ -12,14 +14,12 @@ import EditCompany from '../pages/EditCompany';
 import CreateCustomer from '../pages/CreateCustomer';
 import EditCustomer from '../pages/EditCustomer';
 import Contacts from '../pages/Contacts';
-import Deals from '../pages/Deals';
-import Pipeline from '../pages/Pipeline';
-import Quotes from '../pages/Quotes';
-import Invoices from '../pages/Invoices';
+import CreateContact from '../pages/CreateContact';
+import EditContact from '../pages/EditContact';
+
 import Campaigns from '../pages/Campaigns';
 import EmailMarketing from '../pages/EmailMarketing';
 import WhatsAppCampaigns from '../pages/WhatsAppCampaigns';
-import LandingPages from '../pages/LandingPages';
 import Messages from '../pages/Messages';
 import EmailInbox from '../pages/EmailInbox';
 import Calls from '../pages/Calls';
@@ -32,6 +32,7 @@ import DashboardReports from '../pages/DashboardReports';
 import SalesReports from '../pages/SalesReports';
 import MarketingReports from '../pages/MarketingReports';
 import UserReports from '../pages/UserReports';
+import MeetingReports from '../pages/MeetingReports';
 import Users from '../pages/Users';
 import Roles from '../pages/Roles';
 import PageAccess from '../pages/PageAccess';
@@ -39,8 +40,6 @@ import Teams from '../pages/Teams';
 import Settings from '../pages/Settings';
 import Profile from '../pages/Profile';
 import Notifications from '../pages/Notifications';
-import Integrations from '../pages/Integrations';
-import AuditLogs from '../pages/AuditLogs';
 
 // Define context to pass to router
 export interface MyRouterContext {
@@ -91,6 +90,8 @@ export const indexRoute = createRoute({
 
 // CRM Routes
 const leadsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads', component: Leads });
+const allLeadsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/all', component: AllLeads });
+const unifiedLeadDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/all/$type/$id', component: UnifiedLeadDetails });
 const customersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/customers', component: Customers });
 const createCustomerRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/customers/new', component: CreateCustomer });
 const editCustomerRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/customers/edit/$customerId', component: EditCustomer });
@@ -98,18 +99,15 @@ const companiesRoute = createRoute({ getParentRoute: () => protectedRoute, path:
 const createCompanyRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/companies/new', component: CreateCompany });
 const editCompanyRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/companies/edit/$companyId', component: EditCompany });
 const contactsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/contacts', component: Contacts });
+const createContactRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/contacts/new', component: CreateContact });
+const editContactRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/contacts/edit/$contactId', component: EditContact });
 
-// Sales Routes
-const dealsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/deals', component: Deals });
-const pipelineRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/pipeline', component: Pipeline });
-const quotesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/quotes', component: Quotes });
-const invoicesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/invoices', component: Invoices });
+
 
 // Marketing Routes
 const campaignsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/campaigns', component: Campaigns });
 const emailMarketingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/email-marketing', component: EmailMarketing });
 const whatsappRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/whatsapp-campaigns', component: WhatsAppCampaigns });
-const landingPagesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/landing-pages', component: LandingPages });
 
 // Communication Routes
 const messagesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/messages', component: Messages });
@@ -128,6 +126,7 @@ const reportsDashboardRoute = createRoute({ getParentRoute: () => protectedRoute
 const reportsSalesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/sales', component: SalesReports });
 const reportsMarketingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/marketing', component: MarketingReports });
 const reportsUsersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/users', component: UserReports });
+const meetingReportsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/meeting-reports', component: MeetingReports });
 
 // Administration Routes
 const usersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/users', component: Users });
@@ -139,14 +138,14 @@ const settingsRoute = createRoute({ getParentRoute: () => protectedRoute, path: 
 // System Routes
 const profileRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/profile', component: Profile });
 const notificationsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/notifications', component: Notifications });
-const integrationsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/integrations', component: Integrations });
-const auditLogsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/audit-logs', component: AuditLogs });
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
   protectedRoute.addChildren([
     indexRoute,
     leadsRoute,
+    allLeadsRoute,
+    unifiedLeadDetailsRoute,
     customersRoute,
     createCustomerRoute,
     editCustomerRoute,
@@ -154,14 +153,12 @@ const routeTree = rootRoute.addChildren([
     createCompanyRoute,
     editCompanyRoute,
     contactsRoute,
-    dealsRoute,
-    pipelineRoute,
-    quotesRoute,
-    invoicesRoute,
+    createContactRoute,
+    editContactRoute,
+
     campaignsRoute,
     emailMarketingRoute,
     whatsappRoute,
-    landingPagesRoute,
     messagesRoute,
     emailInboxRoute,
     callsRoute,
@@ -174,6 +171,7 @@ const routeTree = rootRoute.addChildren([
     reportsSalesRoute,
     reportsMarketingRoute,
     reportsUsersRoute,
+    meetingReportsRoute,
     usersRoute,
     rolesRoute,
     pageAccessRoute,
@@ -181,8 +179,6 @@ const routeTree = rootRoute.addChildren([
     settingsRoute,
     profileRoute,
     notificationsRoute,
-    integrationsRoute,
-    auditLogsRoute,
   ]),
 ]);
 

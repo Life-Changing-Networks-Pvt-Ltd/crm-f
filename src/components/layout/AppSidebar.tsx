@@ -58,22 +58,13 @@ const navItems = [
       { title: "Contacts", url: "/contacts", icon: Contact2 },
     ],
   },
-  {
-    title: "Sales",
-    items: [
-      { title: "Deals", url: "/deals", icon: BadgeDollarSign },
-      { title: "Pipeline", url: "/pipeline", icon: KanbanSquare },
-      { title: "Quotes", url: "/quotes", icon: FileText },
-      { title: "Invoices", url: "/invoices", icon: Receipt },
-    ],
-  },
+
   {
     title: "Marketing",
     items: [
       { title: "Campaigns", url: "/campaigns", icon: Megaphone },
       { title: "Email Marketing", url: "/email-marketing", icon: Mail },
-      { title: "WhatsApp", url: "/whatsapp-campaigns", icon: MessageSquare },
-      { title: "Landing Pages", url: "/landing-pages", icon: FileText },
+      { title: "WhatsApp Marketing", url: "/whatsapp-campaigns", icon: MessageSquare },
     ],
   },
   {
@@ -101,6 +92,7 @@ const navItems = [
       { title: "Sales Reports", url: "/reports/sales", icon: LineChart },
       { title: "Marketing Reports", url: "/reports/marketing", icon: PieChart },
       { title: "User Reports", url: "/reports/users", icon: Users },
+      { title: "Meeting Reports", url: "/meeting-reports", icon: FileText },
     ],
   },
   {
@@ -118,8 +110,6 @@ const navItems = [
     items: [
       { title: "Profile", url: "/profile", icon: UserCircle },
       { title: "Notifications", url: "/notifications", icon: Bell },
-      { title: "Integrations", url: "/integrations", icon: Link },
-      { title: "Audit Logs", url: "/audit-logs", icon: History },
     ],
   },
 ]
@@ -130,6 +120,7 @@ export function AppSidebar() {
 
   const hasAccess = (url: string) => {
     if (!user) return false;
+    if ((url === '/users' || url === '/reports/users') && user.role !== 'admin') return false;
     if (user.role === 'admin') return true; // Super admin sees everything
     return user.permissions?.includes(url) || false;
   }

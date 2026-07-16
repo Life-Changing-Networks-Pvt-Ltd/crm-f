@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react"
+import { useSelector } from "react-redux"
+import { useNavigate } from "@tanstack/react-router"
+import type { RootState } from "@/store"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Loader2, Users as UsersIcon, UserPlus, ShieldAlert, Filter, RefreshCcw } from "lucide-react"
@@ -9,6 +12,9 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function UserReports() {
+  const navigate = useNavigate()
+  const { user: currentUser } = useSelector((state: RootState) => state.auth)
+
   const [users, setUsers] = useState<any[]>([])
   const [roles, setRoles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -20,10 +26,15 @@ export default function UserReports() {
   const [endDate, setEndDate] = useState<string>("")
 
   useEffect(() => {
+    if (!currentUser) return; // Wait for hydration
+    if (currentUser.role !== 'admin') {
+      navigate({ to: '/' })
+      return
+    }
     fetchRoles()
     fetchUsers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [currentUser])
 
   const fetchRoles = async () => {
     try {
@@ -37,6 +48,7 @@ export default function UserReports() {
   const fetchUsers = async () => {
     try {
       setLoading(true)
+      setError("")
       
       const params: any = {}
       if (roleFilter && roleFilter !== 'all') params.role = roleFilter
