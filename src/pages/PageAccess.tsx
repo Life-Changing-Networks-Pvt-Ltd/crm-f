@@ -25,9 +25,8 @@ const AVAILABLE_PAGES = [
   { id: '/', label: 'Dashboard', category: 'Dashboard' },
   
   { id: '/leads', label: 'Leads', category: 'CRM' },
-  { id: '/customers', label: 'Customers', category: 'CRM' },
+  { id: '/employees', label: 'Employees', category: 'CRM' },
   { id: '/companies', label: 'Companies', category: 'CRM' },
-  { id: '/contacts', label: 'Contacts', category: 'CRM' },
   
   { id: '/deals', label: 'Deals', category: 'Sales' },
   { id: '/pipeline', label: 'Pipeline', category: 'Sales' },

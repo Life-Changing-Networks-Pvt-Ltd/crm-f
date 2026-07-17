@@ -141,8 +141,7 @@ export default function Notifications() {
                 if (notif.title.includes('Meeting')) {
                   navigate({ to: '/meetings' });
                 } else if (notif.title.includes('Lead')) {
-                  if (notif.message.includes('Customer')) navigate({ to: '/customers' });
-                  else if (notif.message.includes('Company')) navigate({ to: '/companies' });
+                  if (notif.message.includes('Company')) navigate({ to: '/companies' });
                   else navigate({ to: '/leads' });
                 }
               }}

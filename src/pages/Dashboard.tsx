@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react"
-import { Loader2, ArrowRight, Calendar } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import { Loader2, ArrowRight, CalendarDays } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import api from "../services/api"
 
 interface DashboardMetrics {
@@ -18,10 +19,11 @@ interface DashboardMetrics {
 export default function Dashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  
-  const todayStr = new Date().toISOString().split('T')[0];
-  const [startDate, setStartDate] = useState(todayStr)
-  const [endDate, setEndDate] = useState(todayStr)
+  const todayStr = new Date().toISOString().split('T')[0]
+  const [statsPeriod, setStatsPeriod] = useState("today")
+  const [selectedMonth, setSelectedMonth] = useState(todayStr.slice(0, 7))
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
+  const monthRef = useRef<HTMLInputElement>(null)
 
   const navigate = useNavigate()
 
@@ -29,7 +31,13 @@ export default function Dashboard() {
     const fetchDashboardData = async () => {
       try {
         setIsLoading(true)
-        const res = await api.get(`/dashboard?startDate=${startDate}&endDate=${endDate}`)
+        const params: Record<string, string> = { period: statsPeriod }
+        if (statsPeriod === "month") {
+          params.month = selectedMonth
+        } else if (statsPeriod === "year") {
+          params.year = selectedYear
+        }
+        const res = await api.get('/dashboard', { params })
         setMetrics(res.data.data.metrics)
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error)
@@ -39,7 +47,7 @@ export default function Dashboard() {
     }
 
     fetchDashboardData()
-  }, [startDate, endDate])
+  }, [statsPeriod, selectedMonth, selectedYear])
 
   if (isLoading || !metrics) {
     return (
@@ -105,24 +113,37 @@ export default function Dashboard() {
           description="Monitor the real-time status of all your Customers and Companies."
         />
         
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground mr-1" />
-          <div className="flex items-center gap-2 bg-card border rounded-md px-2 py-1 shadow-sm">
-            <span className="text-xs text-muted-foreground font-medium">From</span>
-            <Input 
-              type="date" 
-              value={startDate} 
-              onChange={(e) => setStartDate(e.target.value)}
-              className="h-7 w-[125px] border-0 focus-visible:ring-0 p-0 text-sm bg-transparent"
+        <div className="flex items-center gap-3">
+          <Select value={statsPeriod} onValueChange={setStatsPeriod}>
+            <SelectTrigger className="w-[150px] bg-background">
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="all">All Time</SelectItem>
+              <SelectItem value="month">Month Wise</SelectItem>
+              <SelectItem value="year">Year Wise</SelectItem>
+            </SelectContent>
+          </Select>
+          {statsPeriod === "month" && (
+            <PickerInput
+              inputRef={monthRef}
+              type="month"
+              value={selectedMonth}
+              onChange={setSelectedMonth}
+              className="w-[155px]"
             />
-            <span className="text-xs text-muted-foreground font-medium border-l pl-2">To</span>
-            <Input 
-              type="date" 
-              value={endDate} 
-              onChange={(e) => setEndDate(e.target.value)}
-              className="h-7 w-[125px] border-0 focus-visible:ring-0 p-0 text-sm bg-transparent"
+          )}
+          {statsPeriod === "year" && (
+            <Input
+              type="number"
+              min="1900"
+              max="2100"
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="w-[110px]"
             />
-          </div>
+          )}
         </div>
       </div>
 
@@ -146,6 +167,39 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+    </div>
+  )
+}
+
+function PickerInput({
+  type,
+  value,
+  onChange,
+  className,
+  inputRef,
+}: {
+  type: "month";
+  value: string;
+  onChange: (value: string) => void;
+  className?: string;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+}) {
+  const openPicker = () => {
+    const input = inputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null
+    input?.focus()
+    input?.showPicker?.()
+  }
+
+  return (
+    <div className={`relative ${className || ""}`} onClick={openPicker}>
+      <Input
+        ref={inputRef}
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full cursor-pointer pr-10 [&::-webkit-calendar-picker-indicator]:opacity-0"
+      />
+      <CalendarDays className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
     </div>
   )
 }

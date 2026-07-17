@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Search, Loader2, Building2, Users } from "lucide-react"
+import { ArrowLeft, Search, Loader2, Building2, Users, Send, Mail, MessageSquare } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import api from "@/services/api"
@@ -18,6 +18,7 @@ interface UnifiedLead {
   phone: string;
   type: 'Customer' | 'Company';
   leadStatus: string;
+  followTypeDate?: string;
   createdBy: string;
   assignedTo: string;
   commentsCount: number;
@@ -38,10 +39,16 @@ export default function AllLeads() {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalLoading, setModalLoading] = useState(false)
   const [selectedLeadData, setSelectedLeadData] = useState<any>(null)
+  const [actionDialogOpen, setActionDialogOpen] = useState(false)
+  const [selectedActionLead, setSelectedActionLead] = useState<UnifiedLead | null>(null)
 
   useEffect(() => {
     fetchLeads()
   }, [])
+
+  useEffect(() => {
+    setStatusFilter(searchParams?.status || "All")
+  }, [searchParams?.status])
 
   const fetchLeads = async () => {
     try {
@@ -69,6 +76,20 @@ export default function AllLeads() {
     }
   }
 
+  const openActionDialog = (lead: UnifiedLead) => {
+    setSelectedActionLead(lead)
+    setActionDialogOpen(true)
+  }
+
+  const handleLeadAction = (type: "email" | "whatsapp") => {
+    setActionDialogOpen(false)
+    if (type === "email") {
+      navigate({ to: "/email-marketing" })
+      return
+    }
+    navigate({ to: "/whatsapp-campaigns" })
+  }
+
   const filteredLeads = leads.filter(lead => {
     const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -78,6 +99,7 @@ export default function AllLeads() {
     const matchesStatus = statusFilter === "All" || lead.leadStatus === statusFilter
     
     let matchesDate = true;
+    let matchesFollowUp = true;
     if (dateFilter !== "All") {
       const leadDate = new Date(lead.createdAt);
       const today = new Date();
@@ -90,8 +112,11 @@ export default function AllLeads() {
         matchesDate = leadDate.getMonth() === today.getMonth() && leadDate.getFullYear() === today.getFullYear();
       }
     }
+    if (searchParams?.followUp === "upcoming") {
+      matchesFollowUp = lead.leadStatus === "Follow Up";
+    }
 
-    return matchesSearch && matchesType && matchesDate && matchesStatus
+    return matchesSearch && matchesType && matchesDate && matchesStatus && matchesFollowUp
   })
 
   return (
@@ -123,6 +148,7 @@ export default function AllLeads() {
               <SelectItem value="Interested">Interested</SelectItem>
               <SelectItem value="Not Interested">Not Interested</SelectItem>
               <SelectItem value="Prospective">Prospective</SelectItem>
+              <SelectItem value="Follow Up">Follow Up</SelectItem>
               <SelectItem value="Committed">Committed</SelectItem>
               <SelectItem value="Converted">Converted</SelectItem>
             </SelectContent>
@@ -163,20 +189,20 @@ export default function AllLeads() {
                 <TableHead>Contact Info</TableHead>
                 <TableHead>Created By</TableHead>
                 <TableHead>Assigned To</TableHead>
-                <TableHead>Date Added</TableHead>
                 <TableHead>Comments</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center">
+                  <TableCell colSpan={7} className="h-32 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredLeads.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     No leads found matching your criteria.
                   </TableCell>
                 </TableRow>
@@ -212,9 +238,6 @@ export default function AllLeads() {
                     <TableCell className="text-sm text-muted-foreground">
                       {lead.assignedTo}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(lead.createdAt).toLocaleDateString()}
-                    </TableCell>
                     <TableCell>
                       <Button 
                         variant="ghost" 
@@ -223,6 +246,17 @@ export default function AllLeads() {
                         onClick={() => navigate({ to: `/leads/all/${lead.type}/${lead._id}` })}
                       >
                         {lead.commentsCount} {lead.commentsCount === 1 ? 'Comment' : 'Comments'}
+                      </Button>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => openActionDialog(lead)}
+                      >
+                        <Send className="h-4 w-4" />
+                        Action
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -286,6 +320,35 @@ export default function AllLeads() {
               </div>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Choose Action</DialogTitle>
+            <DialogDescription>
+              Select how you want to contact {selectedActionLead?.name || "this lead"}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Button
+              variant="outline"
+              className="h-24 flex-col gap-2"
+              onClick={() => handleLeadAction("email")}
+            >
+              <Mail className="h-6 w-6 text-blue-500" />
+              Email
+            </Button>
+            <Button
+              variant="outline"
+              className="h-24 flex-col gap-2"
+              onClick={() => handleLeadAction("whatsapp")}
+            >
+              <MessageSquare className="h-6 w-6 text-emerald-500" />
+              WhatsApp
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

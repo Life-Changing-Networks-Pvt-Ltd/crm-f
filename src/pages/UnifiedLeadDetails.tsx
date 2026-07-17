@@ -36,6 +36,7 @@ export default function UnifiedLeadDetails() {
     { value: 'Interested', color: 'bg-emerald-500' },
     { value: 'Not Interested', color: 'bg-red-500' },
     { value: 'Prospective', color: 'bg-purple-500' },
+    { value: 'Follow Up', color: 'bg-yellow-500' },
     { value: 'Committed', color: 'bg-orange-500' },
     { value: 'Converted', color: 'bg-green-500' }
   ]
@@ -303,7 +304,7 @@ export default function UnifiedLeadDetails() {
                   </SelectContent>
                 </Select>
               </div>
-              
+
               <div className="flex flex-col gap-1.5">
                 <span className="text-muted-foreground block text-xs font-semibold uppercase">Assigned To</span>
                 <Select value={lead.assignedTo?._id || ''} onValueChange={handleAssignChange} disabled={assigning}>

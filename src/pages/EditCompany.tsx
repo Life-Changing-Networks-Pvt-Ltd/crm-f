@@ -45,6 +45,16 @@ const BUSINESS_TYPES = [
   "Other"
 ];
 
+const LEAD_STATUSES = [
+  { value: "New", color: "bg-blue-500" },
+  { value: "Interested", color: "bg-emerald-500" },
+  { value: "Not Interested", color: "bg-red-500" },
+  { value: "Prospective", color: "bg-purple-500" },
+  { value: "Follow Up", color: "bg-yellow-500" },
+  { value: "Committed", color: "bg-orange-500" },
+  { value: "Converted", color: "bg-green-500" }
+];
+
 export default function EditCompany() {
   const { companyId } = useParams({ strict: false }) as any
   const navigate = useNavigate()
@@ -70,7 +80,8 @@ export default function EditCompany() {
     website1: '',
     website2: '',
     followTypeDate: '',
-    followType: ''
+    followType: '',
+    leadStatus: 'New'
   })
 
   useEffect(() => {
@@ -109,7 +120,8 @@ export default function EditCompany() {
         website1: data.website1 || '',
         website2: data.website2 || '',
         followTypeDate: formattedDate,
-        followType: data.followType || ''
+        followType: data.leadStatus || data.followType || '',
+        leadStatus: data.leadStatus || 'New'
       })
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to load company details")
@@ -352,18 +364,22 @@ export default function EditCompany() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="followType">Engagement / Follow Type</Label>
-              <Select value={formData.followType} onValueChange={(val) => setFormData(p => ({...p, followType: val}))}>
+              <Select value={formData.leadStatus} onValueChange={(val) => setFormData(p => ({...p, followType: val, leadStatus: val}))}>
                 <SelectTrigger id="followType" className="bg-background">
-                  <SelectValue placeholder="Select interest level..." />
+                  <SelectValue placeholder="Select lead status..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Hot">🔥 Hot (High Intent)</SelectItem>
-                  <SelectItem value="Warm">☀️ Warm (Interested)</SelectItem>
-                  <SelectItem value="Cold">❄️ Cold (Exploring)</SelectItem>
+                  {LEAD_STATUSES.map(status => (
+                    <SelectItem key={status.value} value={status.value}>
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2.5 w-2.5 rounded-full ${status.color}`} />
+                        {status.value}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-
           </CardContent>
         </Card>
 

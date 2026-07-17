@@ -7,15 +7,12 @@ import { AppShell } from '../components/layout/AppShell';
 import Leads from '../pages/Leads';
 import AllLeads from '../pages/AllLeads';
 import UnifiedLeadDetails from '../pages/UnifiedLeadDetails';
-import Customers from '../pages/Customers';
+import Employees from '../pages/Employees';
+import CreateEmployee from '../pages/CreateEmployee';
+import EditEmployee from '../pages/EditEmployee';
 import Companies from '../pages/Companies';
 import CreateCompany from '../pages/CreateCompany';
 import EditCompany from '../pages/EditCompany';
-import CreateCustomer from '../pages/CreateCustomer';
-import EditCustomer from '../pages/EditCustomer';
-import Contacts from '../pages/Contacts';
-import CreateContact from '../pages/CreateContact';
-import EditContact from '../pages/EditContact';
 
 import Campaigns from '../pages/Campaigns';
 import EmailMarketing from '../pages/EmailMarketing';
@@ -92,15 +89,12 @@ export const indexRoute = createRoute({
 const leadsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads', component: Leads });
 const allLeadsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/all', component: AllLeads });
 const unifiedLeadDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/all/$type/$id', component: UnifiedLeadDetails });
-const customersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/customers', component: Customers });
-const createCustomerRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/customers/new', component: CreateCustomer });
-const editCustomerRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/customers/edit/$customerId', component: EditCustomer });
+const employeesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees', component: Employees });
+const createEmployeeRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees/new', component: CreateEmployee });
+const editEmployeeRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees/edit/$employeeId', component: EditEmployee });
 const companiesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/companies', component: Companies });
 const createCompanyRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/companies/new', component: CreateCompany });
 const editCompanyRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/companies/edit/$companyId', component: EditCompany });
-const contactsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/contacts', component: Contacts });
-const createContactRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/contacts/new', component: CreateContact });
-const editContactRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/contacts/edit/$contactId', component: EditContact });
 
 
 
@@ -146,15 +140,12 @@ const routeTree = rootRoute.addChildren([
     leadsRoute,
     allLeadsRoute,
     unifiedLeadDetailsRoute,
-    customersRoute,
-    createCustomerRoute,
-    editCustomerRoute,
+    employeesRoute,
+    createEmployeeRoute,
+    editEmployeeRoute,
     companiesRoute,
     createCompanyRoute,
     editCompanyRoute,
-    contactsRoute,
-    createContactRoute,
-    editContactRoute,
 
     campaignsRoute,
     emailMarketingRoute,

@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   Users,
   Building2,
-  Contact2,
   FileText,
   Megaphone,
   Mail,
@@ -48,9 +47,8 @@ const navItems = [
     title: "CRM",
     items: [
       { title: "Leads", url: "/leads", icon: Users },
-      { title: "Customers", url: "/customers", icon: UserCircle },
+      { title: "Employees", url: "/employees", icon: UserCircle },
       { title: "Companies", url: "/companies", icon: Building2 },
-      { title: "Contacts", url: "/contacts", icon: Contact2 },
     ],
   },
 
