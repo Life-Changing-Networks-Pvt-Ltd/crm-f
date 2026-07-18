@@ -4,8 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Loader2, CalendarRange, User, CalendarDays, CheckCircle, Clock } from "lucide-react"
+import { Loader2, CalendarRange } from "lucide-react"
 import api from "@/services/api"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -35,7 +34,7 @@ export default function AttendanceReports() {
 
   const fetchEmployees = async () => {
     try {
-      const res = await api.get('/users?role=employee')
+      await api.get('/users?role=employee')
       // If we don't have a role filter in /users endpoint, we can just fetch all users and filter locally.
       // But let's assume it brings all for now or we just fetch all users.
       const usersRes = await api.get('/users')

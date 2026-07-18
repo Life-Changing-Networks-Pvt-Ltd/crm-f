@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { PageHeader } from "@/components/layout/PageHeader"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
@@ -86,7 +86,7 @@ export default function Attendance() {
     if (!isAdmin && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        (err) => console.log("Location not granted initially")
+        () => console.log("Location not granted initially")
       )
     }
   }, [isAdmin]);
@@ -112,6 +112,7 @@ export default function Attendance() {
       const res = await api.get(`/attendance/daily?date=${date}`)
       setDailyData(res.data.data || [])
     } catch (err: any) {
+      console.error(err)
       toast.error(err.response?.data?.message || "Failed to fetch attendance")
     } finally {
       setLoading(false)
@@ -134,7 +135,7 @@ export default function Attendance() {
     try {
       const res = await api.get('/employees/me')
       setEmployeeProfile(res.data.data)
-    } catch (err) {
+    } catch {
       console.log("No profile found")
     }
   }
@@ -208,6 +209,7 @@ export default function Attendance() {
         }
       },
       (error) => {
+        console.error(error)
         toast.error("Please allow location access to mark attendance", { id: "location-toast" });
         setMarkingAttendance(false);
       },
@@ -248,6 +250,7 @@ export default function Attendance() {
         }
       },
       (error) => {
+        console.error(error)
         toast.error("Please allow location access to check out", { id: "location-toast" });
         setMarkingAttendance(false);
       },

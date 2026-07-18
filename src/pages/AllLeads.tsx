@@ -2,14 +2,13 @@ import { useState, useEffect } from "react"
 import { useNavigate, useSearch } from "@tanstack/react-router"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Search, Loader2, Building2, Users, Send, Mail, MessageSquare } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { ArrowLeft, Loader2, Building2, Users, Send, Mail, MessageSquare } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import api from "@/services/api"
 import { toast } from "sonner"
-import { Badge } from "@/components/ui/badge"
 
 interface UnifiedLead {
   _id: string;

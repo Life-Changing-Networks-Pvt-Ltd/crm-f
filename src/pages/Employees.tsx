@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { EmptyState } from "@/components/layout/EmptyState"
 import { PageHeader } from "@/components/layout/PageHeader"
-import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import api from "@/services/api"
 import { BriefcaseBusiness, Eye, Loader2, Pencil, Plus, Trash2, UserRound } from "lucide-react"

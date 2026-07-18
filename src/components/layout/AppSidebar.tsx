@@ -6,7 +6,6 @@ import {
   Megaphone,
   Mail,
   MessageSquare,
-  Phone,
   Video,
   ListTodo,
   Calendar,
