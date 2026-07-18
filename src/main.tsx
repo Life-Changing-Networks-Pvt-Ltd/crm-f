@@ -12,6 +12,7 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { setCredentials, logoutUser } from './store/slices/authSlice';
+import { setSettings } from './store/slices/settingsSlice';
 import api from './services/api';
 
 function App() {
@@ -35,8 +36,20 @@ function App() {
       }
     };
 
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get('/settings');
+        if (res.data && res.data.data) {
+          dispatch(setSettings(res.data.data));
+        }
+      } catch (error) {
+        console.error('Failed to fetch settings:', error);
+      }
+    };
+
     if (isAuthenticated) {
       fetchUser();
+      fetchSettings();
     }
   }, [dispatch, isAuthenticated]);
 

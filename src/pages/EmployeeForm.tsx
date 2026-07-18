@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "@tanstack/react-router"
-import { ArrowLeft, BriefcaseBusiness, CreditCard, Loader2, MapPin, Phone, UserRound } from "lucide-react"
+import { ArrowLeft, BriefcaseBusiness, CreditCard, Loader2, MapPin, Phone, UserRound, Eye, EyeOff } from "lucide-react"
 import { toast } from "sonner"
 import api from "@/services/api"
 import { PageHeader } from "@/components/layout/PageHeader"
@@ -15,6 +15,7 @@ const EMPTY_FORM = {
   firstName: "",
   lastName: "",
   email: "",
+  password: "",
   phone: "",
   alternatePhone: "",
   dateOfBirth: "",
@@ -78,6 +79,7 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
   const [generatedId, setGeneratedId] = useState("")
   const [loading, setLoading] = useState(mode === "edit")
   const [submitting, setSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     fetchTeamLeaders()
@@ -105,6 +107,7 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
         firstName: employee.firstName || "",
         lastName: employee.lastName || "",
         email: employee.email || "",
+        password: "", // passwords are not fetched
         phone: employee.phone || "",
         alternatePhone: employee.alternatePhone || "",
         dateOfBirth: formatDate(employee.dateOfBirth),
@@ -163,7 +166,7 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.designation || !formData.department || !formData.joiningDate) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.designation || !formData.department || !formData.joiningDate || (mode === "create" && !formData.password)) {
       toast.error("Please fill all required fields (*)")
       return
     }
@@ -190,6 +193,47 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
     }
   }
 
+  const fillTestData = () => {
+    setFormData({
+      firstName: "John",
+      lastName: "Doe",
+      email: "john.doe@example.com",
+      password: "Password123!",
+      phone: "1234567890",
+      alternatePhone: "0987654321",
+      dateOfBirth: "1990-01-01",
+      gender: "Male",
+      designation: "Software Engineer",
+      department: "Engineering",
+      employmentType: "Full-time",
+      joiningDate: new Date().toISOString().split("T")[0],
+      workLocation: "New York",
+      salary: "120000",
+      status: "Active",
+      manager: "none",
+      address: {
+        line1: "123 Tech Street",
+        line2: "Suite 400",
+        city: "New York",
+        state: "New York",
+        country: "United States",
+        postalCode: "10001",
+      },
+      emergencyContact: {
+        name: "Jane Doe",
+        relationship: "Spouse",
+        phone: "555-1234",
+      },
+      bankDetails: {
+        accountName: "John Doe",
+        accountNumber: "123456789",
+        bankName: "Chase Bank",
+        ifscCode: "CHAS0123456",
+      },
+      notes: "Sample test data for employee creation.",
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -200,14 +244,21 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 pb-10">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/employees" })} className="rounded-full">
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <PageHeader
-          title={mode === "edit" ? "Edit Employee" : "Create Employee"}
-          description={mode === "edit" ? `Update details for ${generatedId}.` : "Employee ID will be generated automatically after saving."}
-        />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate({ to: "/employees" })} className="rounded-full">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <PageHeader
+            title={mode === "edit" ? "Edit Employee" : "Create Employee"}
+            description={mode === "edit" ? `Update details for ${generatedId}.` : "Employee ID will be generated automatically after saving."}
+          />
+        </div>
+        {mode === "create" && (
+          <Button variant="outline" type="button" onClick={fillTestData} className="border-primary text-primary">
+            Fill Test Data
+          </Button>
+        )}
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -238,6 +289,29 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
               <Label htmlFor="email">Email <span className="text-destructive">*</span></Label>
               <Input id="email" type="email" value={formData.email} onChange={(e) => setField("email", e.target.value)} />
             </div>
+            {mode === "create" && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Login Password <span className="text-destructive">*</span></Label>
+                <div className="relative">
+                  <Input 
+                    id="password" 
+                    type={showPassword ? "text" : "password"} 
+                    value={formData.password} 
+                    onChange={(e) => setField("password", e.target.value)} 
+                    placeholder="••••••••" 
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="phone">Phone <span className="text-destructive">*</span></Label>
               <Input id="phone" value={formData.phone} onChange={(e) => setField("phone", e.target.value)} />

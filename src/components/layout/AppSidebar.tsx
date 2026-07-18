@@ -11,7 +11,6 @@ import {
   ListTodo,
   Calendar,
   StickyNote,
-  Activity,
   BarChart3,
   PieChart,
   LineChart,
@@ -20,6 +19,7 @@ import {
   Shield,
   Users2,
   Bell,
+  Clock
 } from "lucide-react"
 
 import {
@@ -49,6 +49,7 @@ const navItems = [
       { title: "Leads", url: "/leads", icon: Users },
       { title: "Employees", url: "/employees", icon: UserCircle },
       { title: "Companies", url: "/companies", icon: Building2 },
+      { title: "Attendance", url: "/attendance", icon: Clock },
     ],
   },
 
@@ -65,7 +66,6 @@ const navItems = [
     items: [
       { title: "Messages", url: "/messages", icon: MessageSquare },
       { title: "Email Inbox", url: "/email-inbox", icon: Mail },
-      { title: "Calls", url: "/calls", icon: Phone },
       { title: "Meetings", url: "/meetings", icon: Video },
     ],
   },
@@ -75,7 +75,6 @@ const navItems = [
       { title: "Tasks", url: "/tasks", icon: ListTodo },
       { title: "Calendar", url: "/calendar", icon: Calendar },
       { title: "Notes", url: "/notes", icon: StickyNote },
-      { title: "Activities", url: "/activities", icon: Activity },
     ],
   },
   {
@@ -86,6 +85,7 @@ const navItems = [
       { title: "Marketing Reports", url: "/reports/marketing", icon: PieChart },
       { title: "User Reports", url: "/reports/users", icon: Users },
       { title: "Meeting Reports", url: "/meeting-reports", icon: FileText },
+      { title: "Attendance Reports", url: "/reports/attendance", icon: FileText },
     ],
   },
   {
@@ -110,10 +110,12 @@ const navItems = [
 export function AppSidebar() {
   const location = useLocation()
   const { user } = useSelector((state: RootState) => state.auth)
+  const { systemName } = useSelector((state: RootState) => state.settings)
 
   const hasAccess = (url: string) => {
     if (!user) return false;
-    if ((url === '/users' || url === '/reports/users') && user.role !== 'admin') return false;
+    if (url === '/attendance') return true; // Everyone can see their attendance
+    if ((url === '/users' || url === '/reports/users' || url === '/reports/attendance') && user.role !== 'admin') return false;
     if (user.role === 'admin') return true; // Super admin sees everything
     return user.permissions?.includes(url) || false;
   }
@@ -132,7 +134,7 @@ export function AppSidebar() {
             <LayoutDashboard className="h-4 w-4" />
           </div>
           <span className="truncate group-data-[collapsible=icon]:hidden">
-            Antigravity CRM
+            {systemName || "Antigravity CRM"}
           </span>
         </RouterLink>
       </SidebarHeader>

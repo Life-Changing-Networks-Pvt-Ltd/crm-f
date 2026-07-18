@@ -2,19 +2,17 @@ import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
-import { Plus, Users, ThumbsUp, ThumbsDown, Target, CalendarDays, Handshake, CheckCircle2, Loader2, Building2 } from "lucide-react"
+import { Plus, Users, ThumbsUp, ThumbsDown, Target, CalendarDays, Handshake, CheckCircle2, Loader2 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import api from "@/services/api"
 import { toast } from "sonner"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 
 export default function Leads() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [statsPeriod, setStatsPeriod] = useState("today")
+  const [statsPeriod, setStatsPeriod] = useState("all")
   const today = new Date().toISOString().split("T")[0]
   const currentMonth = today.slice(0, 7)
   const currentYear = new Date().getFullYear().toString()
@@ -125,7 +123,7 @@ export default function Leads() {
               className="w-[110px]"
             />
           )}
-          <Button onClick={() => setIsModalOpen(true)}>
+          <Button onClick={() => navigate({ to: '/companies/new' })}>
             <Plus className="mr-2 h-4 w-4" /> Add New Lead
           </Button>
         </div>
@@ -163,30 +161,6 @@ export default function Leads() {
           </Card>
         ))}
       </div>
-
-      {/* Quick Create Selection Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl text-center">What kind of Lead?</DialogTitle>
-            <DialogDescription className="text-center">
-              Create a new company lead.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="mt-6">
-            <div 
-              onClick={() => navigate({ to: '/companies/new' })}
-              className="flex flex-col items-center justify-center gap-4 p-8 border rounded-xl hover:border-primary hover:bg-primary/5 cursor-pointer transition-all"
-            >
-              <div className="p-4 bg-blue-100 rounded-full text-blue-600">
-                <Building2 className="h-8 w-8" />
-              </div>
-              <span className="font-semibold text-lg text-foreground">Company</span>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

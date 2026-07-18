@@ -31,7 +31,6 @@ export default function AllLeads() {
   
   const [leads, setLeads] = useState<UnifiedLead[]>([])
   const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState("All")
   const [dateFilter, setDateFilter] = useState("All")
   const [statusFilter, setStatusFilter] = useState(searchParams?.status || "All")
@@ -91,10 +90,6 @@ export default function AllLeads() {
   }
 
   const filteredLeads = leads.filter(lead => {
-    const matchesSearch = lead.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          lead.phone.includes(searchTerm)
-                          
     const matchesType = typeFilter === "All" || lead.type === typeFilter
     const matchesStatus = statusFilter === "All" || lead.leadStatus === statusFilter
     
@@ -116,30 +111,15 @@ export default function AllLeads() {
       matchesFollowUp = lead.leadStatus === "Follow Up";
     }
 
-    return matchesSearch && matchesType && matchesDate && matchesStatus && matchesFollowUp
+    return matchesType && matchesDate && matchesStatus && matchesFollowUp
   })
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="All Unified Leads" description="View and filter all your Companies and Customers.">
-        <Button onClick={() => navigate({ to: '/leads' })} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Leads
-        </Button>
-      </PageHeader>
-
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-card p-4 rounded-lg border">
-        <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search leads..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-3">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px] bg-background">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -155,7 +135,7 @@ export default function AllLeads() {
           </Select>
 
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px] bg-background">
               <SelectValue placeholder="Lead Type" />
             </SelectTrigger>
             <SelectContent>
@@ -166,7 +146,7 @@ export default function AllLeads() {
           </Select>
 
           <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px] bg-background">
               <SelectValue placeholder="Date Added" />
             </SelectTrigger>
             <SelectContent>
@@ -176,8 +156,12 @@ export default function AllLeads() {
               <SelectItem value="This Month">This Month</SelectItem>
             </SelectContent>
           </Select>
+
+          <Button onClick={() => navigate({ to: '/leads' })} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Leads
+          </Button>
         </div>
-      </div>
+      </PageHeader>
 
       <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">

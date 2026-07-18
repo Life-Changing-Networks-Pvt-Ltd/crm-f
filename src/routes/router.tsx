@@ -19,22 +19,22 @@ import EmailMarketing from '../pages/EmailMarketing';
 import WhatsAppCampaigns from '../pages/WhatsAppCampaigns';
 import Messages from '../pages/Messages';
 import EmailInbox from '../pages/EmailInbox';
-import Calls from '../pages/Calls';
 import Meetings from '../pages/Meetings';
+import Settings from '../pages/Settings';
+import Attendance from '../pages/Attendance';
 import Tasks from '../pages/Tasks';
 import Calendar from '../pages/Calendar';
 import Notes from '../pages/Notes';
-import Activities from '../pages/Activities';
 import DashboardReports from '../pages/DashboardReports';
 import SalesReports from '../pages/SalesReports';
 import MarketingReports from '../pages/MarketingReports';
 import UserReports from '../pages/UserReports';
 import MeetingReports from '../pages/MeetingReports';
+import AttendanceReports from '../pages/AttendanceReports';
 import Users from '../pages/Users';
 import Roles from '../pages/Roles';
 import PageAccess from '../pages/PageAccess';
 import Teams from '../pages/Teams';
-import Settings from '../pages/Settings';
 import Profile from '../pages/Profile';
 import Notifications from '../pages/Notifications';
 
@@ -106,14 +106,14 @@ const whatsappRoute = createRoute({ getParentRoute: () => protectedRoute, path: 
 // Communication Routes
 const messagesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/messages', component: Messages });
 const emailInboxRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/email-inbox', component: EmailInbox });
-const callsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calls', component: Calls });
 const meetingsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/meetings', component: Meetings });
+const settingsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/settings', component: Settings });
+const attendanceRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/attendance', component: Attendance });
 
 // Tasks Routes
 const tasksRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/tasks', component: Tasks });
 const calendarRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calendar', component: Calendar });
 const notesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/notes', component: Notes });
-const activitiesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/activities', component: Activities });
 
 // Reports Routes
 const reportsDashboardRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/dashboard', component: DashboardReports });
@@ -121,13 +121,13 @@ const reportsSalesRoute = createRoute({ getParentRoute: () => protectedRoute, pa
 const reportsMarketingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/marketing', component: MarketingReports });
 const reportsUsersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/users', component: UserReports });
 const meetingReportsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/meeting-reports', component: MeetingReports });
+const attendanceReportsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/attendance', component: AttendanceReports });
 
 // Administration Routes
 const usersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/users', component: Users });
 const rolesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/roles', component: Roles });
 const pageAccessRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/page-access', component: PageAccess });
 const teamsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/teams', component: Teams });
-const settingsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/settings', component: Settings });
 
 // System Routes
 const profileRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/profile', component: Profile });
@@ -152,17 +152,17 @@ const routeTree = rootRoute.addChildren([
     whatsappRoute,
     messagesRoute,
     emailInboxRoute,
-    callsRoute,
     meetingsRoute,
     tasksRoute,
     calendarRoute,
     notesRoute,
-    activitiesRoute,
+    attendanceRoute,
     reportsDashboardRoute,
     reportsSalesRoute,
     reportsMarketingRoute,
     reportsUsersRoute,
     meetingReportsRoute,
+    attendanceReportsRoute,
     usersRoute,
     rolesRoute,
     pageAccessRoute,

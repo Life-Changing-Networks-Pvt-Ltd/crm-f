@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import api from "@/services/api"
+import api, { BACKEND_URL } from "@/services/api"
 import { toast } from "sonner"
 
 
@@ -30,6 +30,19 @@ export default function UnifiedLeadDetails() {
   
   const [users, setUsers] = useState<any[]>([])
   const [assigning, setAssigning] = useState(false)
+
+  const getAttachmentUrl = (url: string) => {
+    if (!url) return '';
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.hostname === 'localhost' || urlObj.hostname === '127.0.0.1') {
+        return `${BACKEND_URL}${urlObj.pathname}`;
+      }
+      return url;
+    } catch (e) {
+      return `${BACKEND_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+    }
+  };
 
   const STATUSES = [
     { value: 'New', color: 'bg-blue-500' },
@@ -203,9 +216,9 @@ export default function UnifiedLeadDetails() {
                       {comment.attachment && (
                         <div className="mt-2 rounded-md overflow-hidden border border-border/50">
                           {comment.attachment.fileType === 'video' ? (
-                            <video src={comment.attachment.url} controls className="max-w-full max-h-[300px] object-contain bg-black" />
+                            <video src={getAttachmentUrl(comment.attachment.url)} controls className="max-w-full max-h-[300px] object-contain bg-black" />
                           ) : (
-                            <img src={comment.attachment.url} alt="Attachment" className="max-w-full max-h-[300px] object-contain" />
+                            <img src={getAttachmentUrl(comment.attachment.url)} alt="Attachment" className="max-w-full max-h-[300px] object-contain" />
                           )}
                         </div>
                       )}

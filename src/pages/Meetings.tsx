@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Plus, Loader2 } from "lucide-react"
 import api from "@/services/api"
 import { toast } from "sonner"
-import { Calendar, dateFnsLocalizer } from "react-big-calendar"
-import { format, parse, startOfWeek, getDay } from "date-fns"
-import "react-big-calendar/lib/css/react-big-calendar.css"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -21,25 +20,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-import { enUS } from "date-fns/locale"
-
-const locales = {
-  "en-US": enUS
-}
-
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek,
-  getDay,
-  locales,
-})
-
 export default function Meetings() {
   const { user: currentUser } = useSelector((state: RootState) => state.auth)
   
   const [events, setEvents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [dateFilter, setDateFilter] = useState("All")
   
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -204,30 +190,38 @@ export default function Meetings() {
     return null
   }
 
-  const eventStyleGetter = (event: any) => {
-    let backgroundColor = '#3b82f6' // default blue
-    if (event.status === 'Completed') {
-      backgroundColor = '#10b981' // green for completed
-    } else if (!event.isCreatedByMe) {
-      backgroundColor = '#8b5cf6' // purple for assigned to me
-    }
-    return {
-      style: {
-        backgroundColor,
-        borderRadius: '4px',
-        opacity: 0.9,
-        color: 'white',
-        border: 'none',
-        display: 'block'
+  const filteredEvents = events.filter(event => {
+    let matchesDate = true;
+    if (dateFilter !== "All") {
+      const eventDate = new Date(event.start);
+      const today = new Date();
+      if (dateFilter === "Today") {
+        matchesDate = eventDate.toDateString() === today.toDateString();
+      } else if (dateFilter === "This Week") {
+        const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
+        matchesDate = eventDate >= firstDay;
+      } else if (dateFilter === "This Month") {
+        matchesDate = eventDate.getMonth() === today.getMonth() && eventDate.getFullYear() === today.getFullYear();
       }
     }
-  }
+    return matchesDate;
+  });
 
   return (
     <div className="flex flex-col gap-6 h-full pb-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <PageHeader title="Meetings & Calendar" description="Schedule and manage meetings with your team and clients." />
-        
+      <PageHeader title="Meetings" description="Schedule and manage meetings with your team and clients.">
+        <Select value={dateFilter} onValueChange={setDateFilter}>
+          <SelectTrigger className="w-[140px] bg-background">
+            <SelectValue placeholder="Date Added" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Time</SelectItem>
+            <SelectItem value="Today">Today</SelectItem>
+            <SelectItem value="This Week">This Week</SelectItem>
+            <SelectItem value="This Month">This Month</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
           <DialogTrigger asChild>
             <Button className="shrink-0 gap-2">
@@ -392,38 +386,61 @@ export default function Meetings() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageHeader>
 
-      <div className="flex-1 min-h-[600px] border rounded-lg bg-card p-4 shadow-sm">
+      <div className="flex-1 border rounded-lg bg-card shadow-sm overflow-hidden">
         {loading ? (
-          <div className="h-full flex items-center justify-center">
+          <div className="h-64 flex items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
-          <Calendar
-            localizer={localizer}
-            events={events}
-            startAccessor="start"
-            endAccessor="end"
-            style={{ height: '100%' }}
-            views={['month', 'week', 'day', 'agenda']}
-            eventPropGetter={eventStyleGetter}
-            onSelectEvent={(event) => {
-              setSelectedEvent(event)
-              setIsEventModalOpen(true)
-            }}
-            tooltipAccessor={(e) => `${e.title}\nWith: ${e.participantName}`}
-            components={{
-              event: (props: any) => (
-                <div className="text-xs p-0.5 truncate flex flex-col leading-tight">
-                  <span className="font-semibold">{props.title}</span>
-                  {props.event.participantName && props.event.participantName !== 'Unassigned' && (
-                    <span className="opacity-80 text-[10px]">{props.event.participantName}</span>
-                  )}
-                </div>
-              )
-            }}
-          />
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Date & Time</TableHead>
+                <TableHead>Participant</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredEvents.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No meetings found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredEvents.map((event) => (
+                  <TableRow key={event.id} className="cursor-pointer hover:bg-muted/50" onClick={() => {
+                    setSelectedEvent(event)
+                    setIsEventModalOpen(true)
+                  }}>
+                    <TableCell className="font-medium">{event.title}</TableCell>
+                    <TableCell>{event.type}</TableCell>
+                    <TableCell>{event.start.toLocaleString()}</TableCell>
+                    <TableCell>{event.participantName}</TableCell>
+                    <TableCell>
+                      <Badge variant={event.status === 'Completed' ? 'default' : 'secondary'}>
+                        {event.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedEvent(event)
+                        setIsEventModalOpen(true)
+                      }}>
+                        View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
         )}
       </div>
     </div>

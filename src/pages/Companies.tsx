@@ -9,6 +9,8 @@ import api from "@/services/api"
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import type { RootState } from "@/store"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
@@ -23,6 +25,10 @@ export default function Companies() {
   // View Company State
   const [selectedCompany, setSelectedCompany] = useState<any | null>(null)
   const [isViewOpen, setIsViewOpen] = useState(false)
+
+  // Filters state
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [cityFilter, setCityFilter] = useState("all")
 
   useEffect(() => {
     fetchCompanies()
@@ -76,12 +82,50 @@ export default function Companies() {
     }
   }
 
+  // Derive unique cities for filter dropdown
+  const uniqueCities = Array.from(new Set(companies.map(c => c.city).filter(Boolean))).sort()
+
+  const filteredCompanies = companies.filter((company) => {
+    const matchesStatus = statusFilter === "all" || company.leadStatus === statusFilter
+    const matchesCity = cityFilter === "all" || company.city === cityFilter
+
+    return matchesStatus && matchesCity
+  })
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Companies" description="Manage company profiles.">
-        <Button onClick={() => navigate({ to: '/companies/new' })}>
-          <Plus className="mr-2 h-4 w-4" /> Add New
-        </Button>
+        <div className="flex items-center gap-3">
+          <Select value={cityFilter} onValueChange={setCityFilter}>
+            <SelectTrigger className="w-[150px] bg-background">
+              <SelectValue placeholder="All Cities" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cities</SelectItem>
+              {uniqueCities.map(city => (
+                <SelectItem key={city as string} value={city as string}>{city as string}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px] bg-background">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="New">New</SelectItem>
+              <SelectItem value="Interested">Interested</SelectItem>
+              <SelectItem value="Not Interested">Not Interested</SelectItem>
+              <SelectItem value="Prospective">Prospective</SelectItem>
+              <SelectItem value="Committed">Committed</SelectItem>
+              <SelectItem value="Converted">Converted</SelectItem>
+              <SelectItem value="Follow Up">Follow Up</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button onClick={() => navigate({ to: '/companies/new' })}>
+            <Plus className="mr-2 h-4 w-4" /> Add New
+          </Button>
+        </div>
       </PageHeader>
 
       {loading ? (
@@ -99,7 +143,13 @@ export default function Companies() {
       ) : (
         <Card className="shadow-sm">
           <CardContent className="p-0">
-            <div className="rounded-md border overflow-x-auto">
+
+            {filteredCompanies.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground">
+                No companies match your filters.
+              </div>
+            ) : (
+            <div className="rounded-b-md overflow-x-auto">
               <Table>
                 <TableHeader className="bg-muted/50">
                   <TableRow>
@@ -112,7 +162,7 @@ export default function Companies() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {companies.map((company) => (
+                  {filteredCompanies.map((company) => (
                     <TableRow key={company._id} className="hover:bg-muted/30">
                       <TableCell className="font-medium">
                         {company.companyName}
@@ -170,6 +220,7 @@ export default function Companies() {
                 </TableBody>
               </Table>
             </div>
+            )}
           </CardContent>
         </Card>
       )}

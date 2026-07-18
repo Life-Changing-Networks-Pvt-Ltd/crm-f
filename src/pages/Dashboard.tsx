@@ -20,7 +20,7 @@ export default function Dashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const todayStr = new Date().toISOString().split('T')[0]
-  const [statsPeriod, setStatsPeriod] = useState("today")
+  const [statsPeriod, setStatsPeriod] = useState("all")
   const [selectedMonth, setSelectedMonth] = useState(todayStr.slice(0, 7))
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
   const monthRef = useRef<HTMLInputElement>(null)

@@ -40,18 +40,17 @@ const AVAILABLE_PAGES = [
 
   { id: '/messages', label: 'Messages', category: 'Communication' },
   { id: '/email-inbox', label: 'Email Inbox', category: 'Communication' },
-  { id: '/calls', label: 'Calls', category: 'Communication' },
   { id: '/meetings', label: 'Meetings', category: 'Communication' },
 
   { id: '/tasks', label: 'Tasks', category: 'Tasks' },
   { id: '/calendar', label: 'Calendar', category: 'Tasks' },
   { id: '/notes', label: 'Notes', category: 'Tasks' },
-  { id: '/activities', label: 'Activities', category: 'Tasks' },
   
   { id: '/reports/dashboard', label: 'Dashboard Reports', category: 'Reports' },
   { id: '/reports/sales', label: 'Sales Reports', category: 'Reports' },
   { id: '/reports/marketing', label: 'Marketing Reports', category: 'Reports' },
   { id: '/reports/users', label: 'User Reports', category: 'Reports' },
+  { id: '/reports/attendance', label: 'Attendance Reports', category: 'Reports' },
   
   { id: '/users', label: 'Users', category: 'Administration' },
   { id: '/roles', label: 'Roles & Permissions', category: 'Administration' },

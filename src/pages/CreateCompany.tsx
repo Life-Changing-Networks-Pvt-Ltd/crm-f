@@ -122,6 +122,30 @@ export default function CreateCompany() {
     }
   }
 
+  const fillTestData = () => {
+    setFormData({
+      companyName: 'Acme Corporation',
+      customerName: 'Alice Smith',
+      customerDesignation: 'Director of Procurement',
+      email1: 'alice@acmecorp.com',
+      email2: 'info@acmecorp.com',
+      mobileNo: '+1 (555) 123-4567',
+      phoneNo: '800-555-0199',
+      products: 'Cloud Services, SaaS',
+      businessType: 'Information Technology (IT)',
+      address1: '100 Innovation Drive',
+      address2: 'Suite 300',
+      city: 'San Francisco',
+      state: 'California',
+      country: 'United States',
+      website1: 'https://www.acmecorp.com',
+      website2: 'https://support.acmecorp.com',
+      followTypeDate: new Date().toISOString().split('T')[0],
+      followType: 'Interested',
+      leadStatus: 'Interested'
+    });
+  };
+
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full pb-10">
       <div className="flex items-center justify-between">
@@ -134,9 +158,14 @@ export default function CreateCompany() {
             description="Enter comprehensive details to onboard a new company into the CRM." 
           />
         </div>
-        <Button variant="outline" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => setIsImportModalOpen(true)}>
-          <FileSpreadsheet className="mr-2 h-4 w-4" /> Import Excel
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" type="button" onClick={fillTestData} className="border-primary text-primary">
+            Fill Test Data
+          </Button>
+          <Button variant="outline" className="border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => setIsImportModalOpen(true)}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" /> Import Excel
+          </Button>
+        </div>
       </div>
 
       <ExcelImportModal

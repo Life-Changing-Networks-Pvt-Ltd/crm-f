@@ -8,6 +8,8 @@ const getBaseUrl = () => {
   return import.meta.env.VITE_API_URL || '';
 };
 
+export const BACKEND_URL = getBaseUrl().replace(/\/api$/, '');
+
 const api = axios.create({
   baseURL: getBaseUrl(),
   withCredentials: true, // Important for sending/receiving cookies
