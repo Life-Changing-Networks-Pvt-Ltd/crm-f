@@ -9,6 +9,7 @@ import api from "../services/api"
 
 interface DashboardMetrics {
   new: number;
+  demoScheduled?: number;
   interested: number;
   notInterested: number;
   prospective: number;
@@ -67,6 +68,13 @@ export default function Dashboard() {
       status: "New",
       color: "bg-card text-card-foreground border-border dark:bg-card dark:text-card-foreground dark:border-border",
       dot: "bg-blue-500"
+    },
+    { 
+      title: "Demo Scheduled", 
+      value: metrics.demoScheduled || 0, 
+      status: "Demo Scheduled",
+      color: "bg-card text-card-foreground border-border dark:bg-card dark:text-card-foreground dark:border-border",
+      dot: "bg-cyan-500"
     },
     { 
       title: "Interested", 

@@ -4,11 +4,12 @@ import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2, Send, MessageSquare, Paperclip, X } from "lucide-react"
+import { ArrowLeft, Loader2, Send, MessageSquare, Paperclip, X, Phone, Save } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
 import api, { BACKEND_URL } from "@/services/api"
 import { toast } from "sonner"
 
@@ -30,6 +31,10 @@ export default function UnifiedLeadDetails() {
   
   const [users, setUsers] = useState<any[]>([])
   const [assigning, setAssigning] = useState(false)
+  const [callLogs, setCallLogs] = useState<any[]>([])
+  const [calling, setCalling] = useState(false)
+  const [savingCommentId, setSavingCommentId] = useState<string | null>(null)
+  const [manualComments, setManualComments] = useState<Record<string, string>>({})
 
   const getAttachmentUrl = (url: string) => {
     if (!url) return '';
@@ -46,6 +51,7 @@ export default function UnifiedLeadDetails() {
 
   const STATUSES = [
     { value: 'New', color: 'bg-blue-500' },
+    { value: 'Demo Scheduled', color: 'bg-cyan-500' },
     { value: 'Interested', color: 'bg-emerald-500' },
     { value: 'Not Interested', color: 'bg-red-500' },
     { value: 'Prospective', color: 'bg-purple-500' },
@@ -57,6 +63,7 @@ export default function UnifiedLeadDetails() {
   useEffect(() => {
     fetchLead()
     fetchUsers()
+    fetchCallLogs()
   }, [id, type])
 
   const fetchUsers = async () => {
@@ -78,6 +85,48 @@ export default function UnifiedLeadDetails() {
       navigate({ to: '/leads/all' })
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchCallLogs = async () => {
+    try {
+      const res = await api.get(`/leads/unified/${type}/${id}/calls`)
+      const calls = res.data.data || []
+      setCallLogs(calls)
+      setManualComments(
+        calls.reduce((acc: Record<string, string>, call: any) => {
+          acc[call._id] = call.manualComment || ""
+          return acc
+        }, {})
+      )
+    } catch (err) {
+      console.error("Failed to fetch call logs", err)
+    }
+  }
+
+  const handleClickToCall = async () => {
+    try {
+      setCalling(true)
+      await api.post(`/leads/unified/${type}/${id}/call`)
+      toast.success("Call bridge requested")
+      fetchCallLogs()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to start call")
+    } finally {
+      setCalling(false)
+    }
+  }
+
+  const handleSaveManualComment = async (callId: string) => {
+    try {
+      setSavingCommentId(callId)
+      await api.put(`/leads/calls/${callId}/comment`, { manualComment: manualComments[callId] || "" })
+      toast.success("Call comment saved")
+      fetchCallLogs()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to save comment")
+    } finally {
+      setSavingCommentId(null)
     }
   }
 
@@ -155,6 +204,16 @@ export default function UnifiedLeadDetails() {
       setPreviewUrl(null)
     }
   }
+
+  const assignedUsers = Array.isArray(lead?.assignedTo)
+    ? lead.assignedTo
+    : lead?.assignedTo
+      ? [lead.assignedTo]
+      : []
+
+  const assignedLabel = assignedUsers.length > 0
+    ? assignedUsers.map((user: any) => user?.name || "Unknown").join(", ")
+    : "-"
 
   if (loading) {
     return (
@@ -298,6 +357,11 @@ export default function UnifiedLeadDetails() {
               <CardTitle className="text-sm text-muted-foreground uppercase tracking-wider">Actions</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-5 text-sm">
+              <Button className="gap-2" onClick={handleClickToCall} disabled={calling}>
+                {calling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4" />}
+                Click to Call
+              </Button>
+
               <div className="flex flex-col gap-1.5">
                 <span className="text-muted-foreground block text-xs font-semibold uppercase">Lead Status</span>
                 <Select value={lead.leadStatus} onValueChange={handleStatusChange} disabled={statusUpdating}>
@@ -320,10 +384,10 @@ export default function UnifiedLeadDetails() {
 
               <div className="flex flex-col gap-1.5">
                 <span className="text-muted-foreground block text-xs font-semibold uppercase">Assigned To</span>
-                <Select value={lead.assignedTo?._id || ''} onValueChange={handleAssignChange} disabled={assigning}>
+                <Select value="" onValueChange={handleAssignChange} disabled={assigning}>
                   <SelectTrigger className="w-full">
                     {assigning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    <SelectValue placeholder="Assign a user..." />
+                    <SelectValue placeholder={assignedLabel === "-" ? "Assign a user..." : `Assigned: ${assignedLabel}`} />
                   </SelectTrigger>
                   <SelectContent>
                     {users.filter(u => u._id !== currentUser?._id).map(u => (
@@ -334,6 +398,74 @@ export default function UnifiedLeadDetails() {
                   </SelectContent>
                 </Select>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm border-muted/60">
+            <CardHeader className="pb-3 border-b bg-muted/10">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Phone className="h-4 w-4 text-primary" />
+                Call History
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4 p-4">
+              {callLogs.length === 0 ? (
+                <div className="rounded-md border border-dashed p-5 text-center text-sm text-muted-foreground">
+                  No calls logged yet.
+                </div>
+              ) : (
+                callLogs.map((call) => (
+                  <div key={call._id} className="rounded-md border bg-card p-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{call.calledBy?.name || "User"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(call.callDatetime || call.createdAt).toLocaleString()} · {call.durationSeconds || 0}s
+                        </p>
+                      </div>
+                      <Badge variant={call.status === "completed" ? "default" : call.status === "failed" ? "destructive" : "secondary"}>
+                        {call.status}
+                      </Badge>
+                    </div>
+
+                    {call.recordingUrl && (
+                      <audio src={call.recordingUrl} controls className="mt-3 w-full" />
+                    )}
+
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">Score {call.aiQualityScore || "-"}/10</Badge>
+                        <Badge variant="outline" className="capitalize">{call.aiSentiment || "neutral"}</Badge>
+                      </div>
+                      <p className="text-muted-foreground">{call.aiSummary || "AI notes will appear after the call completion webhook is received."}</p>
+                      {call.aiSuggestion && (
+                        <p className="rounded-md bg-muted p-2 text-xs">
+                          {call.aiSuggestion}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-3 space-y-2">
+                      <Textarea
+                        value={manualComments[call._id] || ""}
+                        onChange={(event) => setManualComments((prev) => ({ ...prev, [call._id]: event.target.value }))}
+                        placeholder="Add your manual call comment..."
+                        className="min-h-[70px] resize-none text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => handleSaveManualComment(call._id)}
+                        disabled={savingCommentId === call._id}
+                      >
+                        {savingCommentId === call._id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                        Save Comment
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              )}
             </CardContent>
           </Card>
         </div>
@@ -384,7 +516,7 @@ export default function UnifiedLeadDetails() {
               <DetailItem label="Lead Source" value={lead?.leadSource} />
               <DetailItem label="Status" value={lead?.leadStatus} />
               <DetailItem label="Created By" value={lead?.createdBy?.name || 'System'} />
-              <DetailItem label="Assigned To" value={lead?.assignedTo?.name || '-'} />
+              <DetailItem label="Assigned To" value={assignedLabel} />
               <DetailItem label="Date Added" value={lead ? new Date(lead.createdAt).toLocaleDateString() : '-'} />
             </div>
           </div>

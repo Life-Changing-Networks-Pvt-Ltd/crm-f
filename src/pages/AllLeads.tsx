@@ -4,9 +4,10 @@ import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Building2, Users, Send, Mail, MessageSquare } from "lucide-react"
+import { ArrowLeft, Loader2, Building2, Users, Send, Mail, MessageSquare, UserPlus } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Checkbox } from "@/components/ui/checkbox"
 import api from "@/services/api"
 import { toast } from "sonner"
 
@@ -24,6 +25,13 @@ interface UnifiedLead {
   createdAt: string;
 }
 
+interface AssignableUser {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 export default function AllLeads() {
   const navigate = useNavigate()
   const searchParams = useSearch({ strict: false }) as any
@@ -39,9 +47,14 @@ export default function AllLeads() {
   const [selectedLeadData, setSelectedLeadData] = useState<any>(null)
   const [actionDialogOpen, setActionDialogOpen] = useState(false)
   const [selectedActionLead, setSelectedActionLead] = useState<UnifiedLead | null>(null)
+  const [selectedLeadKeys, setSelectedLeadKeys] = useState<string[]>([])
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([])
+  const [selectedAssignee, setSelectedAssignee] = useState("")
+  const [assigning, setAssigning] = useState(false)
 
   useEffect(() => {
     fetchLeads()
+    fetchAssignableUsers()
   }, [])
 
   useEffect(() => {
@@ -57,6 +70,15 @@ export default function AllLeads() {
       toast.error(err.response?.data?.message || "Failed to fetch leads")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchAssignableUsers = async () => {
+    try {
+      const res = await api.get('/leads/assignable-users')
+      setAssignableUsers(res.data.data || [])
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to load assignable users")
     }
   }
 
@@ -88,6 +110,52 @@ export default function AllLeads() {
     navigate({ to: "/whatsapp-campaigns" })
   }
 
+  const getLeadKey = (lead: UnifiedLead) => `${lead.type}:${lead._id}`
+
+  const toggleLeadSelection = (lead: UnifiedLead, checked: boolean) => {
+    const key = getLeadKey(lead)
+    setSelectedLeadKeys((prev) => checked ? Array.from(new Set([...prev, key])) : prev.filter((item) => item !== key))
+  }
+
+  const toggleAllVisible = (checked: boolean) => {
+    const visibleKeys = filteredLeads.map(getLeadKey)
+    setSelectedLeadKeys((prev) => {
+      if (!checked) return prev.filter((key) => !visibleKeys.includes(key))
+      return Array.from(new Set([...prev, ...visibleKeys]))
+    })
+  }
+
+  const handleBulkAssign = async () => {
+    if (selectedLeadKeys.length === 0) {
+      toast.error("Select at least one lead")
+      return
+    }
+    if (!selectedAssignee) {
+      toast.error("Select an employee to assign")
+      return
+    }
+
+    try {
+      setAssigning(true)
+      const leadsToAssign = selectedLeadKeys.map((key) => {
+        const [type, id] = key.split(":")
+        return { type, id }
+      })
+      const res = await api.put('/leads/bulk-assign', {
+        assignedTo: selectedAssignee,
+        leads: leadsToAssign,
+      })
+      toast.success(res.data.message || "Leads assigned successfully")
+      setSelectedLeadKeys([])
+      setSelectedAssignee("")
+      fetchLeads()
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to assign leads")
+    } finally {
+      setAssigning(false)
+    }
+  }
+
   const filteredLeads = leads.filter(lead => {
     const matchesType = typeFilter === "All" || lead.type === typeFilter
     const matchesStatus = statusFilter === "All" || lead.leadStatus === statusFilter
@@ -113,6 +181,9 @@ export default function AllLeads() {
     return matchesType && matchesDate && matchesStatus && matchesFollowUp
   })
 
+  const visibleSelectedCount = filteredLeads.filter((lead) => selectedLeadKeys.includes(getLeadKey(lead))).length
+  const allVisibleSelected = filteredLeads.length > 0 && visibleSelectedCount === filteredLeads.length
+
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="All Unified Leads" description="View and filter all your Companies and Customers.">
@@ -124,6 +195,7 @@ export default function AllLeads() {
             <SelectContent>
               <SelectItem value="All">All Statuses</SelectItem>
               <SelectItem value="New">New</SelectItem>
+              <SelectItem value="Demo Scheduled">Demo Scheduled</SelectItem>
               <SelectItem value="Interested">Interested</SelectItem>
               <SelectItem value="Not Interested">Not Interested</SelectItem>
               <SelectItem value="Prospective">Prospective</SelectItem>
@@ -162,11 +234,42 @@ export default function AllLeads() {
         </div>
       </PageHeader>
 
+      <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+        <div className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{selectedLeadKeys.length}</span> selected
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Select value={selectedAssignee} onValueChange={setSelectedAssignee} disabled={assignableUsers.length === 0}>
+            <SelectTrigger className="w-full bg-background sm:w-[280px]">
+              <SelectValue placeholder={assignableUsers.length === 0 ? "No employees available" : "Assign selected to..."} />
+            </SelectTrigger>
+            <SelectContent>
+              {assignableUsers.map((user) => (
+                <SelectItem key={user._id} value={user._id}>
+                  {user.name} ({user.role})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button className="gap-2" onClick={handleBulkAssign} disabled={assigning || selectedLeadKeys.length === 0 || !selectedAssignee}>
+            {assigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+            Assign Leads
+          </Button>
+        </div>
+      </div>
+
       <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[48px]">
+                  <Checkbox
+                    checked={allVisibleSelected ? true : visibleSelectedCount > 0 ? "indeterminate" : false}
+                    onCheckedChange={(checked) => toggleAllVisible(checked === true)}
+                    aria-label="Select all visible leads"
+                  />
+                </TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Contact Info</TableHead>
@@ -179,19 +282,26 @@ export default function AllLeads() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center">
+                  <TableCell colSpan={8} className="h-32 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredLeads.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                     No leads found matching your criteria.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredLeads.map((lead) => (
-                  <TableRow key={lead._id}>
+                  <TableRow key={getLeadKey(lead)}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedLeadKeys.includes(getLeadKey(lead))}
+                        onCheckedChange={(checked) => toggleLeadSelection(lead, checked === true)}
+                        aria-label={`Select ${lead.name}`}
+                      />
+                    </TableCell>
                     <TableCell 
                       className="font-medium text-primary cursor-pointer hover:underline"
                       onClick={() => openLeadDetails(lead)}
@@ -298,7 +408,12 @@ export default function AllLeads() {
                 <DetailItem label="Lead Source" value={selectedLeadData.leadSource} />
                 <DetailItem label="Status" value={selectedLeadData.leadStatus} />
                 <DetailItem label="Created By" value={selectedLeadData.createdBy?.name || 'System'} />
-                <DetailItem label="Assigned To" value={selectedLeadData.assignedTo?.name || '-'} />
+                <DetailItem
+                  label="Assigned To"
+                  value={(Array.isArray(selectedLeadData.assignedTo)
+                    ? selectedLeadData.assignedTo.map((user: any) => user?.name || "Unknown").join(", ")
+                    : selectedLeadData.assignedTo?.name) || '-'}
+                />
                 <DetailItem label="Date Added" value={new Date(selectedLeadData.createdAt).toLocaleDateString()} />
               </div>
             </div>

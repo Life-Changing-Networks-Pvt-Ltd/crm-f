@@ -24,7 +24,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   Select,
@@ -40,6 +39,9 @@ interface UserData {
   name: string;
   email: string;
   role: string;
+  phone?: string;
+  parent?: { _id: string; name: string; role: string } | string | null;
+  status?: string;
   password?: string;
   isActive: boolean;
   createdAt: string;
@@ -67,6 +69,9 @@ export default function Users() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [role, setRole] = useState("")
+  const [phone, setPhone] = useState("")
+  const [parent, setParent] = useState("")
+  const [status, setStatus] = useState("active")
   const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
@@ -100,22 +105,15 @@ export default function Users() {
     }
   }
 
-  const openCreateDialog = () => {
-    setEditingUserId(null)
-    setName("")
-    setEmail("")
-    setPassword("")
-    setRole("")
-    setShowPassword(false)
-    setIsDialogOpen(true)
-  }
-
   const openEditDialog = (u: UserData) => {
     setEditingUserId(u._id)
     setName(u.name)
     setEmail(u.email)
     setPassword(u.password || "") // Pre-fill password
     setRole(u.role)
+    setPhone(u.phone || "")
+    setParent(typeof u.parent === "string" ? u.parent : u.parent?._id || "")
+    setStatus(u.status || (u.isActive ? "active" : "inactive"))
     setShowPassword(false)
     setIsDialogOpen(true)
   }
@@ -142,7 +140,7 @@ export default function Users() {
     try {
       setIsSaving(true)
       
-      const payload: any = { name, email, role }
+      const payload: any = { name, email, role, phone, parent: parent || null, status }
       if (password.trim()) {
         payload.password = password
       }
@@ -223,13 +221,12 @@ export default function Users() {
           description="Manage your team members and assign roles." 
         />
         {currentUser?.role === 'admin' && (
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="shrink-0 gap-2" onClick={openCreateDialog}>
-                <Plus className="h-4 w-4" />
-                Add New User
-              </Button>
-            </DialogTrigger>
+          <>
+            <Button className="shrink-0 gap-2" onClick={() => navigate({ to: '/employees/new' })}>
+              <Plus className="h-4 w-4" />
+              Add New User
+            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
               <DialogTitle>{editingUserId ? 'Edit User' : 'Create New User'}</DialogTitle>
@@ -257,6 +254,15 @@ export default function Users() {
                   placeholder="john@example.com" 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input 
+                  id="phone" 
+                  placeholder="Agent phone number" 
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                 />
               </div>
               <div className="grid gap-2">
@@ -299,6 +305,34 @@ export default function Users() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="parent">Reports To</Label>
+                <Select value={parent || "none"} onValueChange={(value) => setParent(value === "none" ? "" : value)}>
+                  <SelectTrigger id="parent">
+                    <SelectValue placeholder="Select manager" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No parent</SelectItem>
+                    {users
+                      .filter(u => u._id !== editingUserId)
+                      .map(u => (
+                        <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="status">Status</Label>
+                <Select value={status} onValueChange={setStatus}>
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>Cancel</Button>
@@ -308,6 +342,7 @@ export default function Users() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+          </>
         )}
       </div>
 
@@ -318,6 +353,7 @@ export default function Users() {
               <TableHead className="w-[250px]">User</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Reports To</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -325,7 +361,7 @@ export default function Users() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     <p>Loading users...</p>
@@ -334,7 +370,7 @@ export default function Users() {
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <User className="h-8 w-8 opacity-20" />
                     <p>No users found. Create one to get started.</p>
@@ -357,6 +393,9 @@ export default function Users() {
                     <Badge variant={u.role === 'admin' ? 'destructive' : 'secondary'} className="capitalize">
                       {u.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {typeof u.parent === "object" && u.parent ? u.parent.name : "-"}
                   </TableCell>
                   <TableCell>
                     {u.isActive ? (
