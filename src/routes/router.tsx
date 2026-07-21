@@ -37,6 +37,9 @@ import PageAccess from '../pages/PageAccess';
 import Teams from '../pages/Teams';
 import Profile from '../pages/Profile';
 import Notifications from '../pages/Notifications';
+import Calling from '../pages/Calling';
+import CallHistory from '../pages/CallHistory';
+import CallDetails from '../pages/CallDetails';
 
 // Define context to pass to router
 export interface MyRouterContext {
@@ -107,6 +110,9 @@ const whatsappRoute = createRoute({ getParentRoute: () => protectedRoute, path: 
 const messagesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/messages', component: Messages });
 const emailInboxRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/email-inbox', component: EmailInbox });
 const meetingsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/meetings', component: Meetings });
+const callingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calling', component: Calling });
+const callHistoryRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calls', component: CallHistory });
+const callDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calls/$id', component: CallDetails });
 const settingsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/settings', component: Settings });
 const attendanceRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/attendance', component: Attendance });
 
@@ -153,6 +159,9 @@ const routeTree = rootRoute.addChildren([
     messagesRoute,
     emailInboxRoute,
     meetingsRoute,
+    callingRoute,
+    callHistoryRoute,
+    callDetailsRoute,
     tasksRoute,
     calendarRoute,
     notesRoute,

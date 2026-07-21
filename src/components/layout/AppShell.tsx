@@ -3,6 +3,7 @@ import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "./AppSidebar"
 import { AppNavbar } from "./AppNavbar"
 import { GlobalStickyNotes } from "../shared/GlobalStickyNotes"
+import { BrowserCallDialog } from "../shared/BrowserCallDialog"
 
 export function AppShell() {
   return (
@@ -17,6 +18,7 @@ export function AppShell() {
         </div>
       </div>
       <GlobalStickyNotes />
+      <BrowserCallDialog />
     </SidebarProvider>
   )
 }

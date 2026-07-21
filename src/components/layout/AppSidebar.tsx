@@ -18,7 +18,8 @@ import {
   Shield,
   Users2,
   Bell,
-  Clock
+  Clock,
+  PhoneCall
 } from "lucide-react"
 
 import {
@@ -66,6 +67,8 @@ const navItems = [
       { title: "Messages", url: "/messages", icon: MessageSquare },
       { title: "Email Inbox", url: "/email-inbox", icon: Mail },
       { title: "Meetings", url: "/meetings", icon: Video },
+      { title: "Calling", url: "/calling", icon: PhoneCall },
+      { title: "Call History", url: "/calls", icon: PhoneCall },
     ],
   },
   {
@@ -113,8 +116,9 @@ export function AppSidebar() {
 
   const hasAccess = (url: string) => {
     if (!user) return false;
-    if (url === '/attendance') return true; // Everyone can see their attendance
+    if (url === '/attendance' || url === '/calls') return true; // Personal pages are available to every user
     if ((url === '/users' || url === '/reports/users' || url === '/reports/attendance') && user.role !== 'admin') return false;
+    if (url === '/calling' && user.role !== 'admin') return false;
     if (user.role === 'admin') return true; // Super admin sees everything
     return user.permissions?.includes(url) || false;
   }

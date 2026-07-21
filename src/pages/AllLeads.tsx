@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Loader2, Building2, Users, Send, Mail, MessageSquare, UserPlus } from "lucide-react"
+import { ArrowLeft, Loader2, Building2, Users, Send, Mail, MessageSquare, UserPlus, Phone } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -101,13 +101,22 @@ export default function AllLeads() {
     setActionDialogOpen(true)
   }
 
-  const handleLeadAction = (type: "email" | "whatsapp") => {
+  const handleLeadAction = (type: "email" | "whatsapp" | "call" | "comments") => {
     setActionDialogOpen(false)
     if (type === "email") {
       navigate({ to: "/email-marketing" })
       return
     }
-    navigate({ to: "/whatsapp-campaigns" })
+    if (type === "whatsapp") {
+      navigate({ to: "/whatsapp-campaigns" })
+      return
+    }
+    if (type === "call" || type === "comments") {
+      if (selectedActionLead) {
+        navigate({ to: `/leads/all/${selectedActionLead.type}/${selectedActionLead._id}` })
+      }
+      return
+    }
   }
 
   const getLeadKey = (lead: UnifiedLead) => `${lead.type}:${lead._id}`
@@ -275,20 +284,19 @@ export default function AllLeads() {
                 <TableHead>Contact Info</TableHead>
                 <TableHead>Created By</TableHead>
                 <TableHead>Assigned To</TableHead>
-                <TableHead>Comments</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center">
+                  <TableCell colSpan={7} className="h-32 text-center">
                     <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
                   </TableCell>
                 </TableRow>
               ) : filteredLeads.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     No leads found matching your criteria.
                   </TableCell>
                 </TableRow>
@@ -330,16 +338,6 @@ export default function AllLeads() {
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {lead.assignedTo}
-                    </TableCell>
-                    <TableCell>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-primary hover:bg-primary/10 hover:text-primary"
-                        onClick={() => navigate({ to: `/leads/all/${lead.type}/${lead._id}` })}
-                      >
-                        {lead.commentsCount} {lead.commentsCount === 1 ? 'Comment' : 'Comments'}
-                      </Button>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -422,30 +420,41 @@ export default function AllLeads() {
       </Dialog>
 
       <Dialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle>Choose Action</DialogTitle>
-            <DialogDescription>
-              Select how you want to contact {selectedActionLead?.name || "this lead"}.
+        <DialogContent className="sm:max-w-[520px] p-6 border-none shadow-xl bg-card/95 backdrop-blur-sm">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-2xl font-bold text-center">Choose Action</DialogTitle>
+            <DialogDescription className="text-center text-base mt-2">
+              Select how you want to contact <span className="font-semibold text-primary">{selectedActionLead?.name || "this lead"}</span>.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Button
-              variant="outline"
-              className="h-24 flex-col gap-2"
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <button
+              className="group flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-card p-6 text-sm font-medium transition-all hover:-translate-y-1 hover:border-blue-500/30 hover:bg-blue-50/50 hover:shadow-md dark:hover:bg-blue-950/20"
               onClick={() => handleLeadAction("email")}
             >
-              <Mail className="h-6 w-6 text-blue-500" />
-              Email
-            </Button>
-            <Button
-              variant="outline"
-              className="h-24 flex-col gap-2"
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600 transition-transform group-hover:scale-110 dark:bg-blue-900/50 dark:text-blue-400">
+                <Mail className="h-5 w-5" />
+              </div>
+              <span>Email</span>
+            </button>
+            <button
+              className="group flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-card p-6 text-sm font-medium transition-all hover:-translate-y-1 hover:border-emerald-500/30 hover:bg-emerald-50/50 hover:shadow-md dark:hover:bg-emerald-950/20"
               onClick={() => handleLeadAction("whatsapp")}
             >
-              <MessageSquare className="h-6 w-6 text-emerald-500" />
-              WhatsApp
-            </Button>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 transition-transform group-hover:scale-110 dark:bg-emerald-900/50 dark:text-emerald-400">
+                <MessageSquare className="h-5 w-5" />
+              </div>
+              <span>WhatsApp</span>
+            </button>
+            <button
+              className="group flex flex-col items-center justify-center gap-3 rounded-xl border border-border/50 bg-card p-6 text-sm font-medium transition-all hover:-translate-y-1 hover:border-primary/30 hover:bg-primary/5 hover:shadow-md"
+              onClick={() => handleLeadAction("call")}
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary transition-transform group-hover:scale-110">
+                <Phone className="h-5 w-5" />
+              </div>
+              <span>Calls & Comments</span>
+            </button>
           </div>
         </DialogContent>
       </Dialog>
