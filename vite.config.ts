@@ -1,8 +1,15 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, __dirname, '')
+  const crmApiBase = String(env.VITE_API_URL || '').replace(/\/+$/, '')
+  const whatsappApiBase =
+    String(env.VITE_WHATSAPP_MARKETING_API_URL || '').replace(/\/+$/, '') ||
+    (crmApiBase ? `${crmApiBase}/whatsapp-marketing` : '/api/whatsapp-marketing')
+
+  return {
   plugins: [
     {
       name: 'crm-whatsapp-tailwind-compat',
@@ -24,7 +31,7 @@ export default defineConfig({
     dedupe: ['react', 'react-dom'],
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@whatsapp': path.resolve(__dirname, '../sellerslogin-admin/src/features/whatsapp-marketing/app'),
+      '@whatsapp': path.resolve(__dirname, './src/features/whatsapp-marketing/app'),
       react: path.resolve(__dirname, './node_modules/react'),
       'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
     },
@@ -34,8 +41,8 @@ export default defineConfig({
   },
   define: {
     'import.meta.env.VITE_WHATSAPP_MARKETING_API_URL': JSON.stringify(
-      process.env.VITE_WHATSAPP_MARKETING_API_URL || '/api/whatsapp-marketing',
+      whatsappApiBase,
     ),
   },
-  server: { fs: { allow: [path.resolve(__dirname, '..')] } },
+  }
 })

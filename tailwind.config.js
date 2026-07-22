@@ -6,7 +6,7 @@ module.exports = {
     './components/**/*.{ts,tsx}',
     './app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
-    '../sellerslogin-admin/src/features/whatsapp-marketing/app/**/*.{js,ts,jsx,tsx}',
+    './src/features/whatsapp-marketing/app/**/*.{js,ts,jsx,tsx}',
   ],
   theme: {
   	container: {

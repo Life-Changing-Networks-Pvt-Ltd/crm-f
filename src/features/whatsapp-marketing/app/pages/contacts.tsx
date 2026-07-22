@@ -1,0 +1,738 @@
+// @ts-nocheck
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@whatsapp/components/ui/button";
+import { Input } from "@whatsapp/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@whatsapp/components/ui/table";
+import { Avatar, AvatarFallback } from "@whatsapp/components/ui/avatar";
+import { Badge } from "@whatsapp/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@whatsapp/components/ui/dialog";
+import { Label } from "@whatsapp/components/ui/label";
+import { Textarea } from "@whatsapp/components/ui/textarea";
+import { 
+  Users, 
+  Search, 
+  Filter, 
+  Upload, 
+  Download,
+  MoreHorizontal,
+  Trash2,
+  Edit,
+  Loader2,
+  Plus
+} from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@whatsapp/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@whatsapp/components/ui/dropdown-menu";
+import Swal from "sweetalert2";
+import { Checkbox } from "@whatsapp/components/ui/checkbox";
+import * as XLSX from "xlsx";
+
+interface Contact {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  tags: string[];
+  notes?: string;
+  source?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export default function Contacts() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [formData, setFormData] = useState({ name: "", phone: "", email: "", tags: "", notes: "" });
+  const [importData, setImportData] = useState("");
+  const [selectedContactIds, setSelectedContactIds] = useState<string[]>([]);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const contactsPerPage = 10;
+
+  const queryClient = useQueryClient();
+
+  const { data: regularContacts = [], isLoading: isLoadingRegular } = useQuery<Contact[]>({
+    queryKey: ["/api/contacts"],
+    queryFn: async () => {
+      const res = await fetch("/api/contacts");
+      if (!res.ok) throw new Error("Failed to fetch contacts");
+      return res.json();
+    },
+  });
+
+  const { data: importedContacts = [], isLoading: isLoadingImported } = useQuery<Contact[]>({
+    queryKey: ["/api/broadcast/imported-contacts"],
+    queryFn: async () => {
+      const res = await fetch("/api/broadcast/imported-contacts");
+      if (!res.ok) throw new Error("Failed to fetch imported contacts");
+      return res.json();
+    },
+  });
+
+  const contacts = [...regularContacts, ...importedContacts.map(c => ({
+    ...c,
+    tags: c.tags || [],
+    source: c.source || 'import',
+  }))];
+
+  const isLoading = isLoadingRegular || isLoadingImported;
+
+  // Filter contacts based on search
+  const filteredContacts = contacts.filter(c =>
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    c.phone.includes(searchQuery) ||
+    c.tags.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredContacts.length / contactsPerPage);
+  const startIndex = (currentPage - 1) * contactsPerPage;
+  const currentContacts = filteredContacts.slice(startIndex, startIndex + contactsPerPage);
+
+  // Reset to page 1 when search or data changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, contacts]);
+
+  // === Mutations (unchanged except alerts) ===
+  const createMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await fetch("/api/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create contact");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      setIsAddDialogOpen(false);
+      setFormData({ name: "", phone: "", email: "", tags: "", notes: "" });
+      Swal.fire("Success!", "Contact created successfully", "success");
+    },
+    onError: () => {
+      Swal.fire("Error!", "Failed to create contact", "error");
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      alert(id);
+      const res = await fetch(`/api/contacts/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      setIsAddDialogOpen(false);
+      setIsEditDialogOpen(false);
+      setIsImportDialogOpen(false);
+      
+      if (!res.ok) throw new Error("Failed to update contact");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      setIsEditDialogOpen(false);
+      setSelectedContact(null);
+      Swal.fire("Success!", "Contact updated successfully", "success");
+    },
+    onError: () => {
+      Swal.fire("Error!", "Failed to update contact", "error");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async ({ contact }: { contact: Contact }) => {
+      const isImported = contact.source === 'import' || contact.source === 'excel' || contact.source === 'csv';
+      const url = isImported 
+        ? `/api/broadcast/imported-contacts/${contact.id}`
+        : `/api/contacts/${contact.id}`;
+      const res = await fetch(url, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete contact");
+      return { contact, isImported };
+    },
+    onSuccess: ({ isImported }) => {
+      if (isImported) {
+        queryClient.invalidateQueries({ queryKey: ["/api/broadcast/imported-contacts"] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      }
+      Swal.fire("Deleted!", "Contact deleted successfully", "success");
+    },
+    onError: () => {
+      Swal.fire("Error!", "Failed to delete contact", "error");
+    },
+  });
+
+  const deleteMultipleMutation = useMutation({
+    mutationFn: async (contactsToDelete: Contact[]) => {
+      for (const contact of contactsToDelete) {
+        const isImported = contact.source === 'import' || contact.source === 'excel' || contact.source === 'csv';
+        const url = isImported 
+          ? `/api/broadcast/imported-contacts/${contact.id}`
+          : `/api/contacts/${contact.id}`;
+        await fetch(url, { method: "DELETE" });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/broadcast/imported-contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      setSelectedContactIds([]);
+      Swal.fire("Deleted!", "Selected contacts deleted successfully", "success");
+    },
+    onError: () => {
+      Swal.fire("Error!", "Failed to delete some contacts", "error");
+    },
+  });
+
+  const importMutation = useMutation({
+    mutationFn: async (contacts: any[]) => {
+      const res = await fetch("/api/contacts/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contacts }),
+      });
+      if (!res.ok) throw new Error("Failed to import contacts");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contacts"] });
+      setIsImportDialogOpen(false);
+      setImportData("");
+      Swal.fire("Success!", `Imported ${data.imported} contacts successfully`, "success");
+    },
+    onError: () => {
+      Swal.fire("Error!", "Failed to import contacts", "error");
+    },
+  });
+
+  // === Handlers (unchanged) ===
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedContactIds(currentContacts.map((c) => c.id));
+    } else {
+      setSelectedContactIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedContactIds((prev) => [...prev, id]);
+    } else {
+      setSelectedContactIds((prev) => prev.filter((contactId) => contactId !== id));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: `You are about to delete ${selectedContactIds.length} contacts!`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete them!",
+      cancelButtonText: "Cancel",
+    });
+
+    if (result.isConfirmed) {
+      const contactsToDelete = contacts.filter((c) => selectedContactIds.includes(c.id));
+      deleteMultipleMutation.mutate(contactsToDelete);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        
+        const json: any[] = XLSX.utils.sheet_to_json(ws);
+        
+        const csvLines = json.map(row => {
+            const name = row.Name || row.name || '';
+            const phone = String(row.Phone || row.phone || row['Phone Number'] || '');
+            const email = row.Email || row.email || '';
+            const tags = row.Tags || row.tags || '';
+            return `${name},${phone},${email},${tags}`;
+        }).filter(line => line.split(',')[1]);
+        
+        setImportData(csvLines.join("\n"));
+        Swal.fire("Success!", "Excel parsed successfully. Review below and click Import.", "success");
+      } catch(err) {
+        Swal.fire("Error!", "Failed to parse Excel file", "error");
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = ''; // reset so we can upload same file again
+  };
+
+  const handleDownloadTemplate = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      { Name: "John Doe", Phone: "+1234567890", Email: "john@example.com", Tags: "VIP;Customer" }
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, "Contacts_Import_Template.xlsx");
+  };
+
+  const handleAddContact = () => {
+    createMutation.mutate({
+      name: formData.name,
+      phone: formData.phone,
+      email: formData.email || undefined,
+      tags: formData.tags.split(",").map(t => t.trim()).filter(Boolean),
+      notes: formData.notes || undefined,
+    });
+  };
+
+  const handleEditContact = () => {
+    if (!selectedContact) return;
+    updateMutation.mutate({
+      id: selectedContact.id,
+      data: {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email || undefined,
+        tags: formData.tags.split(",").map(t => t.trim()).filter(Boolean),
+        notes: formData.notes || undefined,
+      },
+    });
+  };
+
+  const handleImport = () => {
+    try {
+      const lines = importData.trim().split("\n");
+      const contacts = lines.map(line => {
+        const [name, phone, email, tags] = line.split(",").map(s => s.trim());
+        return {
+          name: name || "Unknown",
+          phone: phone || "",
+          email: email || undefined,
+          tags: tags ? tags.split(";").map(t => t.trim()) : [],
+        };
+      }).filter(c => c.phone);
+      importMutation.mutate(contacts);
+    } catch (error) {
+      Swal.fire("Error!", "Invalid import format", "error");
+    }
+  };
+
+  const handleExport = () => {
+    const csv = contacts.map(c => 
+      `${c.name},${c.phone},${c.email || ""},${c.tags.join(";")}`
+    ).join("\n");
+    const blob = new Blob([`Name,Phone,Email,Tags\n${csv}`], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "contacts.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+    Swal.fire("Success!", "Contacts exported successfully", "success");
+  };
+
+  const openEditDialog = (contact: Contact) => {
+    setSelectedContact(contact);
+    setFormData({
+      name: contact.name,
+      phone: contact.phone,
+      email: contact.email || "",
+      tags: contact.tags.join(", "),
+      notes: contact.notes || "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const getTimeAgo = (date: string) => {
+    const diff = Date.now() - new Date(date).getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+    if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    if (minutes > 0) return `${minutes} min${minutes > 1 ? 's' : ''} ago`;
+    return "Just now";
+  };
+
+  // Pagination controls
+  const goToPage = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  return (
+    <>
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Contacts</h2>
+            <p className="text-muted-foreground">Manage your customer database and segments.</p>
+          </div>
+          <div className="flex gap-2">
+            {selectedContactIds.length > 0 && (
+              <Button 
+                variant="destructive" 
+                onClick={handleDeleteSelected}
+                disabled={deleteMultipleMutation.isPending}
+              >
+                {deleteMultipleMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Delete Selected ({selectedContactIds.length})
+              </Button>
+            )}
+            <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Import Contacts</DialogTitle>
+                  <DialogDescription>
+                    Upload Excel/CSV or paste CSV data. Columns: Name, Phone, Email, Tags (semicolon separated).
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Input 
+                      type="file" 
+                      accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" 
+                      onChange={handleFileUpload} 
+                    />
+                    <Button variant="outline" onClick={handleDownloadTemplate} className="whitespace-nowrap">
+                      <Download className="mr-2 h-4 w-4" /> Template
+                    </Button>
+                  </div>
+                  <Textarea
+                    placeholder="Or paste data here: Your Name,+1234567890,john@email.com,VIP;Customer"
+                    value={importData}
+                    onChange={(e) => setImportData(e.target.value)}
+                    rows={6}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleImport} disabled={importMutation.isPending}>
+                    {importMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Import
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Button variant="outline" onClick={handleExport}>
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Contact
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Contact</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Name *</Label>
+                    <Input
+                      placeholder="Your Name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone Number *</Label>
+                    <Input
+                      placeholder="+1234567890"
+                      value={formData.phone}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      placeholder="Your Email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Tags (comma-separated)</Label>
+                    <Input
+                      placeholder="VIP, Customer, Lead"
+                      value={formData.tags}
+                      onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Notes</Label>
+                    <Textarea
+                      placeholder="Additional notes..."
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleAddContact} disabled={createMutation.isPending || !formData.name || !formData.phone}>
+                    {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Add Contact
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>All Contacts</CardTitle>
+                <CardDescription>Total {filteredContacts.length} contacts found.</CardDescription>
+              </div>
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <div className="relative w-64">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search contacts..." 
+                    className="pl-9"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                <Button variant="outline" size="icon">
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <>
+                {/* Scrollable Table Container (optional fixed height) */}
+                <div className="overflow-y-auto max-h-[500px] rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12">
+                          <Checkbox 
+                            checked={currentContacts.length > 0 && selectedContactIds.length === currentContacts.length}
+                            onCheckedChange={handleSelectAll}
+                            aria-label="Select all"
+                          />
+                        </TableHead>
+                        <TableHead className="w-[250px]">Name</TableHead>
+                        <TableHead>Phone Number</TableHead>
+                        <TableHead>Tags</TableHead>
+                        <TableHead>Last Updated</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {currentContacts.length > 0 ? (
+                        currentContacts.map((contact) => (
+                          <TableRow key={contact.id}>
+                            <TableCell>
+                              <Checkbox 
+                                checked={selectedContactIds.includes(contact.id)}
+                                onCheckedChange={(checked) => handleSelectOne(contact.id, checked as boolean)}
+                                aria-label="Select contact"
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                    {contact.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div>{contact.name}</div>
+                                  {contact.email && <div className="text-xs text-muted-foreground">{contact.email}</div>}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>{contact.phone}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-wrap gap-1">
+                                {contact.tags.map(tag => (
+                                  <Badge key={tag} variant="secondary" className="text-xs font-normal">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{getTimeAgo(contact.updatedAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => openEditDialog(contact)}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem 
+                                    className="text-destructive"
+                                    onClick={async () => {
+                                      const result = await Swal.fire({
+                                        title: "Are you sure?",
+                                        text: "You won't be able to revert this!",
+                                        icon: "warning",
+                                        showCancelButton: true,
+                                        confirmButtonText: "Yes, delete it!",
+                                        cancelButtonText: "Cancel",
+                                      });
+
+                                      if (result.isConfirmed) {
+                                        deleteMutation.mutate({ contact });
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                            No contacts found.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {startIndex + 1}–{Math.min(startIndex + contactsPerPage, filteredContacts.length)} of {filteredContacts.length} contacts
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <span className="flex items-center px-3 text-sm">
+                        Page {currentPage} of {totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Contact</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Name *</Label>
+              <Input
+                placeholder="Your Name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone Number *</Label>
+              <Input
+                placeholder="+1234567890"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="Your Email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Tags (comma-separated)</Label>
+              <Input
+                placeholder="VIP, Customer, Lead"
+                value={formData.tags}
+                onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Additional notes..."
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleEditContact} disabled={updateMutation.isPending || !formData.name || !formData.phone}>
+              {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

@@ -1,0 +1,129 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+.whatsapp-marketing-app {
+  --font-sans: "Inter", sans-serif;
+  --font-heading: "Plus Jakarta Sans", sans-serif;
+
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(222 47% 11%);
+
+  --color-primary: hsl(142 76% 36%); /* WhatsApp Green-ish but professional */
+  --color-primary-foreground: hsl(0 0% 100%);
+
+  --color-secondary: hsl(210 40% 96%);
+  --color-secondary-foreground: hsl(222 47% 11%);
+
+  --color-muted: hsl(210 40% 96%);
+  --color-muted-foreground: hsl(215 16% 47%);
+
+  --color-accent: hsl(210 40% 96%);
+  --color-accent-foreground: hsl(222 47% 11%);
+
+  --color-destructive: hsl(0 84% 60%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+
+  --color-border: hsl(214 32% 91%);
+  --color-input: hsl(214 32% 91%);
+  --color-ring: hsl(142 76% 36%);
+
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(222 47% 11%);
+
+  --color-sidebar: hsl(221 32% 74%);
+  --color-sidebar-foreground: hsl(222 47% 11%);
+  --color-sidebar-primary: hsl(142 76% 36%);
+  --color-sidebar-primary-foreground: hsl(0 0% 100%);
+  --color-sidebar-accent: hsl(220 30% 61%);
+  --color-sidebar-accent-foreground: hsl(222 47% 11%);
+  --color-sidebar-border: hsl(219 25% 62%);
+  --color-sidebar-ring: hsl(142 76% 36%);
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+
+  font-family: var(--font-sans);
+  background-color: hsl(210 40% 98%);
+  color: var(--color-foreground);
+}
+
+.whatsapp-marketing-app h1,
+.whatsapp-marketing-app h2,
+.whatsapp-marketing-app h3,
+.whatsapp-marketing-app h4,
+.whatsapp-marketing-app h5,
+.whatsapp-marketing-app h6 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+@layer base {
+  .whatsapp-marketing-app * {
+    border-color: var(--color-border);
+  }
+}
+
+/* Hide scrollbar for WebKit browsers (Chrome, Safari, Edge) */
+.whatsapp-marketing-app .hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for Firefox */
+.whatsapp-marketing-app .hide-scrollbar {
+  scrollbar-width: none;
+}
+
+.whatsapp-marketing-app .hide-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.whatsapp-marketing-app .hide-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Scope scrollbar overrides specifically to the WhatsApp app content */
+.whatsapp-marketing-app * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.whatsapp-marketing-app *::-webkit-scrollbar {
+  display: none;
+}
+
+/* If you want to target only the sidebar specifically */
+.whatsapp-marketing-app [data-sidebar] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.whatsapp-marketing-app [data-sidebar]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Target the sidebar content specifically */
+.whatsapp-marketing-app [data-sidebar="content"] {
+  overflow-y: auto !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.whatsapp-marketing-app [data-sidebar="content"]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+}
+
+/* tailwind.css content inside app container */
+.whatsapp-marketing-app ::-webkit-scrollbar {
+  width: 6px;
+}
+.whatsapp-marketing-app ::-webkit-scrollbar-thumb {
+  background-color: rgba(0,0,0,0.2);
+  border-radius: 10px;
+}
