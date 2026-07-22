@@ -24,7 +24,8 @@
     "baseUrl": ".",
     "ignoreDeprecations": "6.0",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@whatsapp/*": ["../sellerslogin-admin/src/features/whatsapp-marketing/app/*"]
     }
   },
   "include": ["src"]

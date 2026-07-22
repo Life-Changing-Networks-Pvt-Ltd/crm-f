@@ -58,7 +58,7 @@ const navItems = [
     items: [
       { title: "Campaigns", url: "/campaigns", icon: Megaphone },
       { title: "Email Marketing", url: "/email-marketing", icon: Mail },
-      { title: "WhatsApp Marketing", url: "/whatsapp-campaigns", icon: MessageSquare },
+      { title: "WhatsApp Marketing", url: "/whatsapp-marketing", icon: MessageSquare },
     ],
   },
   {

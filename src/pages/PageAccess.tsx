@@ -35,7 +35,7 @@ const AVAILABLE_PAGES = [
 
   { id: '/campaigns', label: 'Campaigns', category: 'Marketing' },
   { id: '/email-marketing', label: 'Email Marketing', category: 'Marketing' },
-  { id: '/whatsapp-campaigns', label: 'WhatsApp', category: 'Marketing' },
+  { id: '/whatsapp-marketing', label: 'WhatsApp', category: 'Marketing' },
   { id: '/landing-pages', label: 'Landing Pages', category: 'Marketing' },
 
   { id: '/messages', label: 'Messages', category: 'Communication' },

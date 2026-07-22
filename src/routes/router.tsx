@@ -16,7 +16,7 @@ import EditCompany from '../pages/EditCompany';
 
 import Campaigns from '../pages/Campaigns';
 import EmailMarketing from '../pages/EmailMarketing';
-import WhatsAppCampaigns from '../pages/WhatsAppCampaigns';
+import WhatsAppMarketingModule from '../pages/WhatsAppMarketingModule';
 import Messages from '../pages/Messages';
 import EmailInbox from '../pages/EmailInbox';
 import Meetings from '../pages/Meetings';
@@ -104,7 +104,12 @@ const editCompanyRoute = createRoute({ getParentRoute: () => protectedRoute, pat
 // Marketing Routes
 const campaignsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/campaigns', component: Campaigns });
 const emailMarketingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/email-marketing', component: EmailMarketing });
-const whatsappRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/whatsapp-campaigns', component: WhatsAppCampaigns });
+const requireAuthentication = ({ context }: { context: MyRouterContext }) => {
+  if (!context.auth.isAuthenticated) throw redirect({ to: '/login' });
+};
+const whatsappRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-marketing', component: WhatsAppMarketingModule, beforeLoad: requireAuthentication });
+const whatsappWildcardRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-marketing/$', component: WhatsAppMarketingModule, beforeLoad: requireAuthentication });
+const legacyWhatsappRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-campaigns', beforeLoad: () => { throw redirect({ to: '/whatsapp-marketing' }); } });
 
 // Communication Routes
 const messagesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/messages', component: Messages });
@@ -141,6 +146,9 @@ const notificationsRoute = createRoute({ getParentRoute: () => protectedRoute, p
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
+  whatsappRoute,
+  whatsappWildcardRoute,
+  legacyWhatsappRoute,
   protectedRoute.addChildren([
     indexRoute,
     leadsRoute,
@@ -155,7 +163,6 @@ const routeTree = rootRoute.addChildren([
 
     campaignsRoute,
     emailMarketingRoute,
-    whatsappRoute,
     messagesRoute,
     emailInboxRoute,
     meetingsRoute,
