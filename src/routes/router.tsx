@@ -103,10 +103,11 @@ const editCompanyRoute = createRoute({ getParentRoute: () => protectedRoute, pat
 
 // Marketing Routes
 const campaignsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/campaigns', component: Campaigns });
-const emailMarketingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/email-marketing', component: EmailMarketing });
 const requireAuthentication = ({ context }: { context: MyRouterContext }) => {
   if (!context.auth.isAuthenticated) throw redirect({ to: '/login' });
 };
+const emailMarketingRoute = createRoute({ getParentRoute: () => rootRoute, path: '/email-marketing', component: EmailMarketing, beforeLoad: requireAuthentication });
+const emailMarketingWildcardRoute = createRoute({ getParentRoute: () => rootRoute, path: '/email-marketing/$', component: EmailMarketing, beforeLoad: requireAuthentication });
 const whatsappRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-marketing', component: WhatsAppMarketingModule, beforeLoad: requireAuthentication });
 const whatsappWildcardRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-marketing/$', component: WhatsAppMarketingModule, beforeLoad: requireAuthentication });
 const legacyWhatsappRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-campaigns', beforeLoad: () => { throw redirect({ to: '/whatsapp-marketing' }); } });
@@ -146,6 +147,8 @@ const notificationsRoute = createRoute({ getParentRoute: () => protectedRoute, p
 
 const routeTree = rootRoute.addChildren([
   loginRoute,
+  emailMarketingRoute,
+  emailMarketingWildcardRoute,
   whatsappRoute,
   whatsappWildcardRoute,
   legacyWhatsappRoute,
@@ -162,7 +165,6 @@ const routeTree = rootRoute.addChildren([
     editCompanyRoute,
 
     campaignsRoute,
-    emailMarketingRoute,
     messagesRoute,
     emailInboxRoute,
     meetingsRoute,

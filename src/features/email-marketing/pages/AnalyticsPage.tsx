@@ -1,0 +1,40 @@
+import { useEffect, useMemo, useState } from "react"
+import { Link } from "@tanstack/react-router"
+import { BarChart3, Clock3, Eye, IndianRupee, Laptop, MapPin, MousePointerClick, Send, Smartphone, Tablet } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useEmailMarketingStore } from "../EmailMarketingStore"
+import { emailMarketingRequest } from "../emailMarketingApi"
+import { EmptyPanel, MetricCard, ModulePage, PageContainer, PageHeading, StatusPill } from "../components/PageElements"
+import { getEmailMarketingPath } from "../navigation"
+import { aggregateCampaigns, number, rate } from "./analyticsUtils"
+
+type AnalyticsView = "overview" | "engagement" | "conversion" | "device" | "time" | "campaign"
+const tabs: Array<[AnalyticsView, string, string]> = [["overview", "Overview", "/analytics"], ["engagement", "Opened / Clicked", "/analytics/email-opened-clicked"], ["conversion", "Conversion / Revenue", "/analytics/conversion-revenue"], ["device", "Device & Location", "/analytics/device-location"], ["time", "Time Analytics", "/analytics/time-analytics"], ["campaign", "Campaign Analytics", "/analytics/campaign-analytics"]]
+
+export function AnalyticsPage({ view }: { view: AnalyticsView }) {
+  const { campaigns } = useEmailMarketingStore()
+  const [range, setRange] = useState("30")
+  const fallbackTotals = useMemo(() => aggregateCampaigns(campaigns), [campaigns])
+  const [analyticsTotals, setAnalyticsTotals] = useState<typeof fallbackTotals | null>(null)
+  useEffect(() => {
+    const days = range === "all" ? "366" : range
+    void emailMarketingRequest<{ totals: typeof fallbackTotals }>("get", `/analytics/overview?days=${days}`)
+      .then((result) => setAnalyticsTotals(result.totals))
+      .catch(() => setAnalyticsTotals(null))
+  }, [range])
+  const totals = analyticsTotals || fallbackTotals
+  const maxSent = Math.max(...campaigns.map((item) => item.metrics.sent), 1)
+  return <ModulePage><PageContainer>
+    <PageHeading title="Analytics & reporting" description="Measure engagement, conversion signals, audience context, and campaign performance." actions={<Select value={range} onValueChange={setRange}><SelectTrigger className="w-40"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="7">Last 7 days</SelectItem><SelectItem value="30">Last 30 days</SelectItem><SelectItem value="90">Last 90 days</SelectItem><SelectItem value="all">All time</SelectItem></SelectContent></Select>} />
+    <nav className="flex gap-2 overflow-x-auto rounded-2xl border bg-card p-2">{tabs.map(([key, label, path]) => <Button key={key} variant={view === key ? "default" : "ghost"} size="sm" asChild><Link to={getEmailMarketingPath(path) as never}>{label}</Link></Button>)}</nav>
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><MetricCard label="Emails sent" value={number(totals.sent)} helper={`${number(totals.delivered)} delivered`} icon={<Send className="h-5 w-5" />} /><MetricCard label="Open rate" value={rate(totals.opens, totals.delivered)} helper={`${number(totals.opens)} recorded opens`} icon={<Eye className="h-5 w-5" />} tone="success" /><MetricCard label="Click rate" value={rate(totals.clicks, totals.delivered)} helper={`${number(totals.clicks)} recorded clicks`} icon={<MousePointerClick className="h-5 w-5" />} /><MetricCard label="CTOR" value={rate(totals.clicks, totals.opens)} helper="Clicks from recorded opens" icon={<BarChart3 className="h-5 w-5" />} tone="muted" /></section>
+    {view === "conversion" ? <section className="grid gap-4 md:grid-cols-3"><MetricCard label="Attributed conversions" value="0" helper="Requires commerce event integration" icon={<MousePointerClick className="h-5 w-5" />} /><MetricCard label="Revenue generated" value="₹0" helper="No attributed revenue yet" icon={<IndianRupee className="h-5 w-5" />} tone="success" /><MetricCard label="Conversion rate" value="0.00%" helper="Conversions from delivered emails" icon={<BarChart3 className="h-5 w-5" />} tone="muted" /></section> : null}
+    {view === "device" ? <section className="grid gap-6 lg:grid-cols-2"><div className="rounded-2xl border bg-card p-5"><h3 className="font-semibold">Devices</h3><div className="mt-5 space-y-5">{[["Desktop", 0, Laptop], ["Mobile", 0, Smartphone], ["Tablet", 0, Tablet]].map(([label, value, Icon]) => { const DeviceIcon = Icon as typeof Laptop; return <div key={String(label)}><div className="flex justify-between text-sm"><span className="flex items-center gap-2"><DeviceIcon className="h-4 w-4 text-primary" />{String(label)}</span><span>{Number(value)}%</span></div><div className="mt-2 h-2 rounded-full bg-muted"><div className="h-2 rounded-full bg-primary" style={{ width: `${Number(value)}%` }} /></div></div> })}</div></div><div className="rounded-2xl border bg-card p-5"><h3 className="font-semibold">Top locations</h3><EmptyPanel title="No location data yet" description="Location breakdown appears after tracked email engagement." /></div></section> : null}
+    {view === "time" ? <section className="grid gap-6 lg:grid-cols-2"><div className="rounded-2xl border bg-card p-5"><Clock3 className="h-8 w-8 text-primary" /><h3 className="mt-4 font-semibold">Best engagement time</h3><p className="mt-2 text-3xl font-bold">Not available yet</p><p className="mt-2 text-sm text-muted-foreground">A best hour is calculated once enough tracked opens and clicks are available.</p></div><div className="rounded-2xl border bg-card p-5"><MapPin className="h-8 w-8 text-primary" /><h3 className="mt-4 font-semibold">Best engagement day</h3><p className="mt-2 text-3xl font-bold">Not available yet</p><p className="mt-2 text-sm text-muted-foreground">Day-of-week performance appears after enough tracked engagement events are collected.</p></div></section> : null}
+    <section className="rounded-2xl border bg-card shadow-sm"><div className="border-b p-5"><h3 className="font-semibold">Campaign performance</h3><p className="mt-1 text-xs text-muted-foreground">Comparative engagement for the selected time range.</p></div>{campaigns.length ? <><div className="space-y-4 p-5">{campaigns.slice(0, 8).map((campaign) => <div key={campaign.id}><div className="mb-2 flex items-center justify-between gap-3 text-sm"><span className="truncate font-medium">{campaign.name}</span><span className="text-muted-foreground">{number(campaign.metrics.sent)} sent</span></div><div className="h-2 rounded-full bg-muted"><div className="h-2 rounded-full bg-primary" style={{ width: `${Math.max((campaign.metrics.sent / maxSent) * 100, campaign.metrics.sent ? 4 : 0)}%` }} /></div></div>)}</div><div className="overflow-x-auto border-t"><Table><TableHeader><TableRow><TableHead>Campaign</TableHead><TableHead>Status</TableHead><TableHead>Delivered</TableHead><TableHead>Open rate</TableHead><TableHead>Click rate</TableHead><TableHead>Bounce rate</TableHead></TableRow></TableHeader><TableBody>{campaigns.map((campaign) => <TableRow key={campaign.id}><TableCell className="font-medium">{campaign.name}</TableCell><TableCell><StatusPill status={campaign.status} /></TableCell><TableCell>{number(campaign.metrics.delivered)}</TableCell><TableCell>{rate(campaign.metrics.opens, campaign.metrics.delivered)}</TableCell><TableCell>{rate(campaign.metrics.clicks, campaign.metrics.delivered)}</TableCell><TableCell>{rate(campaign.metrics.bounces, campaign.metrics.sent)}</TableCell></TableRow>)}</TableBody></Table></div></> : <div className="p-5"><EmptyPanel title="No campaign analytics yet" description="Create and send campaigns to populate performance reporting." action={<Button asChild><Link to={getEmailMarketingPath("/campaigns/create") as never}>Create campaign</Link></Button>} /></div>}</section>
+    <p className="text-xs text-muted-foreground">Summary metrics use tracked backend events for the selected time range; campaign rows use the synchronized CRM workspace snapshot.</p>
+  </PageContainer></ModulePage>
+}
