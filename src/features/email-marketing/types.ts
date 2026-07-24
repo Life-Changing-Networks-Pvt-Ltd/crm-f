@@ -35,10 +35,16 @@ export interface Subscriber {
 
 export interface EmailBlock {
   id: string
-  type: "heading" | "text" | "button" | "image" | "divider" | "spacer"
+  type: "heading" | "text" | "button" | "image" | "video" | "dynamic" | "logo" | "social" | "html" | "divider" | "product" | "navigation" | "spacer"
   content: string
   href?: string
   align?: "left" | "center" | "right"
+  alt?: string
+  imageUrl?: string
+  subtitle?: string
+  price?: string
+  buttonText?: string
+  items?: Array<{ label: string; url: string }>
 }
 
 export interface EmailTemplate {

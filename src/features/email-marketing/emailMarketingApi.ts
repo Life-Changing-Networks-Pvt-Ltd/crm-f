@@ -50,3 +50,14 @@ export async function downloadEmailMarketingReport(params: URLSearchParams) {
   link.click()
   URL.revokeObjectURL(url)
 }
+
+export async function uploadEmailMarketingImage(file: File) {
+  const formData = new FormData()
+  formData.append("file", file)
+  const response = await api.post(`${BASE}/uploads/image/file`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  })
+  return normalizeServerIds<{ id: string; url: string; originalName: string }>(
+    response.data?.data,
+  )
+}

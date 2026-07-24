@@ -20,8 +20,10 @@ import { MetricCard, ModulePage, PageContainer } from "../components/PageElement
 
 const ranges = ["Today", "Yesterday", "Last 7 days", "Last 30 days", "Custom range"] as const
 type DashboardRange = (typeof ranges)[number]
+const EVENTS_PER_PAGE = 10
 
 interface AnalyticsTotals {
+  sent: number
   delivered: number
   uniqueOpens: number
   uniqueClicks: number
@@ -43,6 +45,7 @@ interface TrackingEvent {
 }
 
 const emptyTotals: AnalyticsTotals = {
+  sent: 0,
   delivered: 0,
   uniqueOpens: 0,
   uniqueClicks: 0,
@@ -84,10 +87,16 @@ export function OverviewPage() {
   const [range, setRange] = useState<DashboardRange>("Last 7 days")
   const [analytics, setAnalytics] = useState<AnalyticsTotals>(emptyTotals)
   const [trackingEvents, setTrackingEvents] = useState<TrackingEvent[]>([])
+  const [eventPage, setEventPage] = useState(1)
 
   const subscribed = subscribers.filter((subscriber) => subscriber.status === "subscribed").length
   const unsubscribed = subscribers.filter((subscriber) => subscriber.status === "unsubscribed").length
   const suppressed = subscribers.filter((subscriber) => subscriber.status === "suppressed").length
+
+  useEffect(() => {
+    setEventPage(1)
+  }, [range])
+
   useEffect(() => {
     let cancelled = false
     const params = getRangeParams(range)
@@ -105,6 +114,7 @@ export function OverviewPage() {
       } catch {
         if (!cancelled) {
           setAnalytics({
+            sent: campaigns.reduce((sum, campaign) => sum + campaign.metrics.sent, 0),
             delivered: campaigns.reduce((sum, campaign) => sum + campaign.metrics.delivered, 0),
             uniqueOpens: campaigns.reduce((sum, campaign) => sum + campaign.metrics.opens, 0),
             uniqueClicks: campaigns.reduce((sum, campaign) => sum + campaign.metrics.clicks, 0),
@@ -121,8 +131,22 @@ export function OverviewPage() {
     }
   }, [campaigns, range])
 
+  const eventPageCount = Math.max(1, Math.ceil(trackingEvents.length / EVENTS_PER_PAGE))
+  const currentEventPage = Math.min(eventPage, eventPageCount)
+  const visibleTrackingEvents = trackingEvents.slice(
+    (currentEventPage - 1) * EVENTS_PER_PAGE,
+    currentEventPage * EVENTS_PER_PAGE,
+  )
+  const firstVisibleEvent = trackingEvents.length
+    ? (currentEventPage - 1) * EVENTS_PER_PAGE + 1
+    : 0
+  const lastVisibleEvent = Math.min(
+    currentEventPage * EVENTS_PER_PAGE,
+    trackingEvents.length,
+  )
+
   const metrics = [
-    { label: "Campaigns", value: campaigns.length, helper: `${campaigns.filter((campaign) => campaign.status === "scheduled").length} scheduled`, icon: <Send className="h-5 w-5" />, tone: "primary" as const },
+    { label: "Total Mail Sent", value: analytics.sent, helper: `${analytics.sent} emails sent`, icon: <Send className="h-5 w-5" />, tone: "primary" as const },
     { label: "Delivered", value: analytics.delivered, helper: `${analytics.delivered} delivery events recorded`, icon: <MailCheck className="h-5 w-5" />, tone: "success" as const },
     { label: "Opens", value: analytics.uniqueOpens, helper: `${analytics.uniqueOpens} unique opens`, icon: <Eye className="h-5 w-5" />, tone: "success" as const },
     { label: "Clicks", value: analytics.uniqueClicks, helper: `${analytics.uniqueClicks} unique clicks`, icon: <MousePointerClick className="h-5 w-5" />, tone: "primary" as const },
@@ -206,6 +230,7 @@ export function OverviewPage() {
             <h3 className="mt-1 text-base font-semibold text-card-foreground">Latest email events</h3>
           </div>
           {trackingEvents.length ? (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -216,7 +241,7 @@ export function OverviewPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {trackingEvents.map((event) => (
+                {visibleTrackingEvents.map((event) => (
                   <TableRow key={event.id}>
                     <TableCell className="py-3 text-xs font-medium capitalize">
                       {event.eventType.replaceAll("_", " ")}
@@ -234,6 +259,33 @@ export function OverviewPage() {
                 ))}
               </TableBody>
             </Table>
+            <div className="flex flex-col gap-3 border-t px-5 py-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Showing {firstVisibleEvent}-{lastVisibleEvent} of {trackingEvents.length} events
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={currentEventPage === 1}
+                  onClick={() => setEventPage((page) => Math.max(1, page - 1))}
+                >
+                  Previous
+                </Button>
+                <span>Page {currentEventPage} of {eventPageCount}</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={currentEventPage === eventPageCount}
+                  onClick={() => setEventPage((page) => Math.min(eventPageCount, page + 1))}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+            </>
           ) : (
             <div className="flex min-h-36 items-center justify-center p-6 text-center text-xs text-muted-foreground">
               Email delivery, open, click, bounce, complaint, and unsubscribe events will appear here.

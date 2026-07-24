@@ -53,6 +53,29 @@ const EMPTY_PLATFORM_SENDER: EmailMarketingSender = {
   fromEmail: "",
   replyTo: "",
 }
+const EMPTY_CAMPAIGN_METRICS: EmailCampaign["metrics"] = {
+  sent: 0,
+  delivered: 0,
+  opens: 0,
+  clicks: 0,
+  bounces: 0,
+  unsubscribes: 0,
+}
+
+function normalizeCampaign(campaign: EmailCampaign, previous?: EmailCampaign): EmailCampaign {
+  const candidate = campaign as Partial<EmailCampaign>
+  return {
+    ...campaign,
+    metrics: {
+      ...EMPTY_CAMPAIGN_METRICS,
+      ...(previous?.metrics || {}),
+      ...(candidate.metrics || {}),
+    },
+    activity: Array.isArray(candidate.activity)
+      ? candidate.activity
+      : previous?.activity || [],
+  }
+}
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase()
@@ -67,7 +90,7 @@ function readCachedState(): EmailMarketingState {
       templates: Array.isArray(parsed.templates) ? parsed.templates : [],
       segments: Array.isArray(parsed.segments) ? parsed.segments : [],
       suppressions: Array.isArray(parsed.suppressions) ? parsed.suppressions : [],
-      campaigns: Array.isArray(parsed.campaigns) ? parsed.campaigns : [],
+      campaigns: Array.isArray(parsed.campaigns) ? parsed.campaigns.map((campaign) => normalizeCampaign(campaign)) : [],
       domains: Array.isArray(parsed.domains) ? parsed.domains : [],
       automations: Array.isArray(parsed.automations) ? parsed.automations : [],
       billing: parsed.billing && typeof parsed.billing === "object"
@@ -109,6 +132,12 @@ function campaignPayload(input: Partial<CampaignInput>) {
   } = input
   return {
     ...payload,
+    ...(Object.hasOwn(payload, "templateId")
+      ? { templateId: payload.templateId || "" }
+      : {}),
+    ...(Object.hasOwn(payload, "segmentId")
+      ? { segmentId: payload.segmentId || "" }
+      : {}),
     ...(dripSteps
       ? {
           dripSteps: dripSteps.map(({ id: _id, ...step }) => step),
@@ -188,7 +217,12 @@ export function EmailMarketingStoreProvider({ children }: { children: ReactNode 
         permissions: TeamPermission[]
         config: { platformSender: EmailMarketingSender }
       }>("get", "/integration/snapshot")
-      setState({ ...EMPTY_STATE, ...snapshot.state, billing: { ...EMPTY_BILLING, ...snapshot.state.billing } })
+      setState({
+        ...EMPTY_STATE,
+        ...snapshot.state,
+        campaigns: (snapshot.state.campaigns || []).map((campaign) => normalizeCampaign(campaign)),
+        billing: { ...EMPTY_BILLING, ...snapshot.state.billing },
+      })
       setPermissions(snapshot.permissions)
       setPlatformSender(snapshot.config.platformSender)
       setSyncError("")
@@ -304,8 +338,9 @@ export function EmailMarketingStoreProvider({ children }: { children: ReactNode 
     } else if (input.status === "active") {
       item = await emailMarketingRequest("post", `/campaigns/${item.id}/send`)
     }
-    setState((current) => ({ ...current, campaigns: [item, ...current.campaigns] }))
-    return item
+    const normalized = normalizeCampaign(item)
+    setState((current) => ({ ...current, campaigns: [normalized, ...current.campaigns] }))
+    return normalized
   }, [])
   const updateCampaign = useCallback(async (id: string, updates: Partial<CampaignInput>) => {
     const payload = campaignPayload(updates)
@@ -317,13 +352,19 @@ export function EmailMarketingStoreProvider({ children }: { children: ReactNode 
     } else if (updates.status === "active") {
       item = await emailMarketingRequest("post", `/campaigns/${id}/send`)
     }
-    if (item) replace("campaigns", item)
-    return item
+    if (!item) return null
+    const normalized = normalizeCampaign(
+      item,
+      state.campaigns.find((campaign) => campaign.id === id),
+    )
+    replace("campaigns", normalized)
+    return normalized
   }, [replace, state.campaigns])
   const duplicateCampaign = useCallback(async (id: string) => {
     const item = await emailMarketingRequest<EmailCampaign>("post", `/campaigns/${id}/duplicate`)
-    setState((current) => ({ ...current, campaigns: [item, ...current.campaigns] }))
-    return item
+    const normalized = normalizeCampaign(item)
+    setState((current) => ({ ...current, campaigns: [normalized, ...current.campaigns] }))
+    return normalized
   }, [])
   const setCampaignStatus = useCallback(async (id: string, status: CampaignStatus) => {
     const actions: Partial<Record<CampaignStatus, string>> = {
@@ -336,8 +377,12 @@ export function EmailMarketingStoreProvider({ children }: { children: ReactNode 
     const action = actions[status]
     if (!action) return state.campaigns.find((item) => item.id === id) || null
     const item = await emailMarketingRequest<EmailCampaign>("post", `/campaigns/${id}/${action}`)
-    replace("campaigns", item)
-    return item
+    const normalized = normalizeCampaign(
+      item,
+      state.campaigns.find((campaign) => campaign.id === id),
+    )
+    replace("campaigns", normalized)
+    return normalized
   }, [replace, state.campaigns])
   const deleteCampaign = useCallback(async (id: string) => {
     await emailMarketingRequest("delete", `/campaigns/${id}`)

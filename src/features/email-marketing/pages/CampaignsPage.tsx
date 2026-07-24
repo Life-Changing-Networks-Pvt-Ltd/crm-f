@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Edit3,
   MoreHorizontal,
   Pause,
   Play,
@@ -72,6 +73,7 @@ export function CampaignsPage({ initialCreateMode }: CampaignsPageProps) {
   const [createMode, setCreateMode] = useState<CreateMode>(initialCreateMode || null)
   const [actionId, setActionId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
+  const actionMenuRef = useRef<HTMLDivElement>(null)
   const filterRowRef = useRef<HTMLDivElement>(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(false)
@@ -83,6 +85,30 @@ export function CampaignsPage({ initialCreateMode }: CampaignsPageProps) {
   useEffect(() => {
     setPage(1)
   }, [query, status, scope])
+
+  useEffect(() => {
+    if (!actionId) return
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node
+        && actionMenuRef.current?.contains(event.target)
+      ) {
+        return
+      }
+      setActionId(null)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setActionId(null)
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer)
+    document.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer)
+      document.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [actionId])
 
   useEffect(() => {
     const row = filterRowRef.current
@@ -140,6 +166,13 @@ export function CampaignsPage({ initialCreateMode }: CampaignsPageProps) {
       "Campaign duplicated",
       "Campaign could not be duplicated.",
     )
+  }
+
+  const edit = (campaign: EmailCampaign) => {
+    setActionId(null)
+    void navigate({
+      to: getEmailMarketingPath(`/campaigns/${campaign.id}/edit`) as never,
+    })
   }
 
   const changeStatus = (campaign: EmailCampaign, nextStatus: CampaignStatus) => {
@@ -338,7 +371,10 @@ export function CampaignsPage({ initialCreateMode }: CampaignsPageProps) {
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                       {actionId === campaign.id ? (
-                        <div className="absolute right-4 top-14 z-30 w-48 rounded-xl border bg-popover p-1 text-left shadow-lg">
+                        <div
+                          ref={actionMenuRef}
+                          className="absolute right-4 top-14 z-30 w-48 rounded-xl border bg-popover p-1 text-left shadow-lg"
+                        >
                           <Link
                             to={getEmailMarketingPath(`/campaigns/${campaign.id}`) as never}
                             className="block rounded-lg px-3 py-2 text-sm hover:bg-accent"
@@ -346,14 +382,15 @@ export function CampaignsPage({ initialCreateMode }: CampaignsPageProps) {
                           >
                             View details
                           </Link>
-                          {["draft", "scheduled", "paused"].includes(campaign.status) ? (
-                            <Link
-                              to={getEmailMarketingPath(`/campaigns/${campaign.id}/edit`) as never}
-                              className="block rounded-lg px-3 py-2 text-sm hover:bg-accent"
-                              onClick={() => setActionId(null)}
+                          {["draft", "scheduled", "paused", "sent"].includes(campaign.status) ? (
+                            <button
+                              type="button"
+                              className="flex w-full items-center rounded-lg px-3 py-2 text-sm hover:bg-accent"
+                              onClick={() => edit(campaign)}
                             >
+                              <Edit3 className="mr-2 h-4 w-4" />
                               Edit campaign
-                            </Link>
+                            </button>
                           ) : null}
                           <button
                             type="button"

@@ -74,8 +74,8 @@ export function CampaignFormPage({ id, drip = false, presetKey }: { id?: string;
   const existing = store.campaigns.find((campaign) => campaign.id === id)
   const [form, setForm] = useState<CampaignInput>(() => existing ? {
     name: existing.name, type: existing.type, goal: existing.goal, subject: existing.subject, previewText: existing.previewText,
-    fromName: existing.fromName, fromEmail: existing.fromEmail, replyTo: existing.replyTo, templateId: existing.templateId,
-    audienceMode: existing.audienceMode, segmentId: existing.segmentId, subscriberIds: existing.subscriberIds, status: existing.status,
+    fromName: existing.fromName, fromEmail: existing.fromEmail, replyTo: existing.replyTo, templateId: existing.templateId || "",
+    audienceMode: existing.audienceMode, segmentId: existing.segmentId || "", subscriberIds: existing.subscriberIds || [], status: existing.status,
     scheduledAt: toDateTimeLocal(existing.scheduledAt), timezone: existing.timezone, isRecurring: existing.isRecurring,
     recurrenceInterval: existing.recurrenceInterval, recurrenceUnit: existing.recurrenceUnit, recurrenceEndAt: existing.recurrenceEndAt ? toDateTimeLocal(existing.recurrenceEndAt) : "",
     dripTargetAudience: existing.dripTargetAudience, dripSteps: existing.dripSteps, totalRecipients: existing.totalRecipients,
@@ -131,9 +131,15 @@ export function CampaignFormPage({ id, drip = false, presetKey }: { id?: string;
       const saved = id ? await store.updateCampaign(id, payload) : await store.createCampaign(payload)
       if (!saved) return toast.error("Campaign could not be saved.")
       toast.success(status === "scheduled" ? "Campaign scheduled" : status === "active" ? "Drip campaign activated" : "Campaign saved")
-      void navigate({ to: getEmailMarketingPath(`/campaigns/${saved.id}`) as never })
-    } catch {
-      toast.error("Campaign could not be saved. Check sender and delivery configuration.")
+      const destination = status === "scheduled" ? "/campaigns" : `/campaigns/${saved.id}`
+      void navigate({ to: getEmailMarketingPath(destination) as never })
+    } catch (error) {
+      toast.error(
+        getEmailMarketingErrorMessage(
+          error,
+          "Campaign could not be saved. Check sender and delivery configuration.",
+        ),
+      )
     }
   }
 
@@ -155,9 +161,7 @@ export function CampaignFormPage({ id, drip = false, presetKey }: { id?: string;
         previewText: form.previewText,
         templateId,
       })
-      toast.success("Test email sent", {
-        description: `SES accepted the test email for ${testEmail.trim()}.`,
-      })
+      toast.success("Test Email Sent Successfully")
       setTestOpen(false)
     } catch (error) {
       toast.error(

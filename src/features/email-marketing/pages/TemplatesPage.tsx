@@ -127,7 +127,6 @@ export function TemplatesPage() {
                         <Button type="button" size="icon" variant="outline" className="h-8 w-8 shrink-0" onClick={() => setPreview(template)} title="Preview template"><Eye className="h-4 w-4" /></Button>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">#{(currentPage - 1) * pageSize + index + 1}, Updated on {formatDate(template.updatedAt)}</p>
-                      <div className="mt-3 flex items-center gap-2 text-xs font-medium capitalize"><span className={`h-2.5 w-2.5 ${template.status === "active" ? "bg-emerald-500" : template.status === "archived" ? "bg-slate-400" : "bg-amber-500"}`} />{template.status}</div>
                     </div>
                   </div>
 
