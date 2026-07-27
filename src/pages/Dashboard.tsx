@@ -5,50 +5,38 @@ import { PageHeader } from "@/components/layout/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import api from "../services/api"
-
-interface DashboardMetrics {
-  new: number;
-  demoScheduled?: number;
-  interested: number;
-  notInterested: number;
-  prospective: number;
-  committed: number;
-  converted: number;
-}
+import { useDashboardMetrics } from "@/hooks/useDashboardMetrics"
 
 export default function Dashboard() {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
   const todayStr = new Date().toISOString().split('T')[0]
   const [statsPeriod, setStatsPeriod] = useState("all")
   const [selectedMonth, setSelectedMonth] = useState(todayStr.slice(0, 7))
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
+  const [yearInput, setYearInput] = useState(selectedYear)
   const monthRef = useRef<HTMLInputElement>(null)
 
   const navigate = useNavigate()
+  const {
+    data: metrics,
+    isLoading,
+    error,
+  } = useDashboardMetrics({
+    period: statsPeriod,
+    month: selectedMonth,
+    year: selectedYear,
+  })
 
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setIsLoading(true)
-        const params: Record<string, string> = { period: statsPeriod }
-        if (statsPeriod === "month") {
-          params.month = selectedMonth
-        } else if (statsPeriod === "year") {
-          params.year = selectedYear
-        }
-        const res = await api.get('/dashboard', { params })
-        setMetrics(res.data.data.metrics)
-      } catch (error) {
-        console.error("Failed to fetch dashboard data:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+    if (error) console.error("Failed to fetch dashboard data:", error)
+  }, [error])
 
-    fetchDashboardData()
-  }, [statsPeriod, selectedMonth, selectedYear])
+  const commitYear = () => {
+    if (/^\d{4}$/.test(yearInput) && Number(yearInput) >= 1900 && Number(yearInput) <= 2100) {
+      setSelectedYear(yearInput)
+    } else {
+      setYearInput(selectedYear)
+    }
+  }
 
   if (isLoading || !metrics) {
     return (
@@ -147,8 +135,12 @@ export default function Dashboard() {
               type="number"
               min="1900"
               max="2100"
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
+              value={yearInput}
+              onChange={(e) => setYearInput(e.target.value)}
+              onBlur={commitYear}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur()
+              }}
               className="w-[110px]"
             />
           )}

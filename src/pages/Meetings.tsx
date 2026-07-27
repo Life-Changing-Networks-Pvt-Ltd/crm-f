@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { PageHeader } from "@/components/layout/PageHeader"
@@ -19,12 +19,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DataPagination } from "@/components/shared/DataPagination"
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
 
 export default function Meetings() {
   const { user: currentUser } = useSelector((state: RootState) => state.auth)
   
-  const [events, setEvents] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
   const [dateFilter, setDateFilter] = useState("All")
   
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -52,21 +53,34 @@ export default function Meetings() {
   const [users, setUsers] = useState<any[]>([])
   const [customers, setCustomers] = useState<any[]>([])
   const [companies, setCompanies] = useState<any[]>([])
+  const [participantsLoaded, setParticipantsLoaded] = useState(false)
 
-  useEffect(() => {
-    fetchEvents()
-    fetchParticipantsData()
-  }, [])
-
-  const fetchEvents = async () => {
-    try {
-      setLoading(true)
-      const res = await api.get('/events')
-      // Map to react-big-calendar format
-      const formatted = res.data.data.map((e: any) => {
+  const dateRange = useMemo(() => {
+    if (dateFilter === "All") return {}
+    const today = new Date()
+    let start = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    let end = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999)
+    if (dateFilter === "This Week") {
+      start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - today.getDay())
+      end = new Date(start)
+      end.setDate(start.getDate() + 6)
+      end.setHours(23, 59, 59, 999)
+    } else if (dateFilter === "This Month") {
+      start = new Date(today.getFullYear(), today.getMonth(), 1)
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999)
+    }
+    return { startDate: start.toISOString(), endDate: end.toISOString() }
+  }, [dateFilter])
+  const { data, isLoading: loading, refetch: fetchEvents } = usePaginatedQuery<any>({
+    endpoint: "/events/paged",
+    page,
+    limit: 25,
+    params: dateRange,
+  })
+  const events = useMemo(() => (data?.items || []).map((e: any) => {
         const start = new Date(e.date)
         const end = new Date(e.date)
-        end.setHours(end.getHours() + 1) // default 1 hour duration
+        end.setHours(end.getHours() + 1)
         return {
           id: e._id,
           title: e.title,
@@ -78,26 +92,23 @@ export default function Meetings() {
           status: e.status,
           isCreatedByMe: e.createdBy?._id === currentUser?._id
         }
-      })
-      setEvents(formatted)
-    } catch (err) {
-      console.error(err)
-      toast.error("Failed to load meetings")
-    } finally {
-      setLoading(false)
-    }
-  }
+      }), [data?.items, currentUser?._id])
+
+  useEffect(() => {
+    if (isModalOpen && !participantsLoaded) void fetchParticipantsData()
+  }, [isModalOpen, participantsLoaded])
 
   const fetchParticipantsData = async () => {
     try {
       const [uRes, cRes, compRes] = await Promise.all([
-        api.get('/users'),
-        api.get('/customers'),
-        api.get('/companies')
+        api.get('/users/options', { params: { purpose: 'meeting' } }),
+        api.get('/customers/options'),
+        api.get('/companies/options')
       ])
       setUsers(uRes.data.data)
       setCustomers(cRes.data.data)
       setCompanies(compRes.data.data)
+      setParticipantsLoaded(true)
     } catch (err) {
       console.error(err)
     }
@@ -129,7 +140,7 @@ export default function Meetings() {
       await api.post('/events', payload)
       toast.success("Meeting scheduled successfully")
       setIsModalOpen(false)
-      fetchEvents() // refresh
+      await fetchEvents()
       
       // reset form
       setTitle("")
@@ -161,7 +172,7 @@ export default function Meetings() {
       toast.success("Meeting marked as completed and report saved");
       setIsReportModalOpen(false);
       setIsEventModalOpen(false);
-      fetchEvents();
+      await fetchEvents();
       
       // reset
       setDurationMinutes("");
@@ -190,27 +201,13 @@ export default function Meetings() {
     return null
   }
 
-  const filteredEvents = events.filter(event => {
-    let matchesDate = true;
-    if (dateFilter !== "All") {
-      const eventDate = new Date(event.start);
-      const today = new Date();
-      if (dateFilter === "Today") {
-        matchesDate = eventDate.toDateString() === today.toDateString();
-      } else if (dateFilter === "This Week") {
-        const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
-        matchesDate = eventDate >= firstDay;
-      } else if (dateFilter === "This Month") {
-        matchesDate = eventDate.getMonth() === today.getMonth() && eventDate.getFullYear() === today.getFullYear();
-      }
-    }
-    return matchesDate;
-  });
-
   return (
     <div className="flex flex-col gap-6 h-full pb-8">
       <PageHeader title="Meetings" description="Schedule and manage meetings with your team and clients.">
-        <Select value={dateFilter} onValueChange={setDateFilter}>
+        <Select value={dateFilter} onValueChange={(value) => {
+          setDateFilter(value)
+          setPage(1)
+        }}>
           <SelectTrigger className="w-[140px] bg-background">
             <SelectValue placeholder="Date Added" />
           </SelectTrigger>
@@ -406,14 +403,14 @@ export default function Meetings() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredEvents.length === 0 ? (
+              {events.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     No meetings found.
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEvents.map((event) => (
+                events.map((event) => (
                   <TableRow key={event.id} className="cursor-pointer hover:bg-muted/50" onClick={() => {
                     setSelectedEvent(event)
                     setIsEventModalOpen(true)
@@ -441,6 +438,9 @@ export default function Meetings() {
               )}
             </TableBody>
           </Table>
+        )}
+        {data?.pagination && (
+          <DataPagination pagination={data.pagination} onPageChange={setPage} />
         )}
       </div>
     </div>

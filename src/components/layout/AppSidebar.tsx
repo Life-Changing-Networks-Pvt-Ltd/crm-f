@@ -3,6 +3,7 @@ import {
   Users,
   Building2,
   FileText,
+  Megaphone,
   Mail,
   MessageSquare,
   Video,
@@ -55,6 +56,7 @@ const navItems = [
   {
     title: "Marketing",
     items: [
+      { title: "Campaigns", url: "/campaigns", icon: Megaphone },
       { title: "Email Marketing", url: "/email-marketing", icon: Mail },
       { title: "WhatsApp Marketing", url: "/whatsapp-marketing", icon: MessageSquare },
     ],
@@ -63,6 +65,7 @@ const navItems = [
     title: "Communication",
     items: [
       { title: "Messages", url: "/messages", icon: MessageSquare },
+      { title: "Email Inbox", url: "/email-inbox", icon: Mail },
       { title: "Meetings", url: "/meetings", icon: Video },
       { title: "Calling", url: "/calling", icon: PhoneCall },
       { title: "Call History", url: "/calls", icon: PhoneCall },

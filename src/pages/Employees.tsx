@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmptyState } from "@/components/layout/EmptyState"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
+import { DataPagination } from "@/components/shared/DataPagination"
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
+import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import api from "@/services/api"
 import { BriefcaseBusiness, Eye, Loader2, Pencil, Plus, Trash2, UserRound } from "lucide-react"
 import { toast } from "sonner"
@@ -15,30 +19,27 @@ import Swal from "sweetalert2"
 
 export default function Employees() {
   const navigate = useNavigate()
-  const [employees, setEmployees] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
   const [isViewOpen, setIsViewOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState("")
+  const debouncedSearch = useDebouncedValue(search)
 
   // Filters state
   const [statusFilter, setStatusFilter] = useState("all")
   const [departmentFilter, setDepartmentFilter] = useState("all")
 
-  useEffect(() => {
-    fetchEmployees()
-  }, [])
-
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true)
-      const res = await api.get("/employees")
-      setEmployees(res.data.data || [])
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to fetch employees")
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data, isLoading: loading, refetch } = usePaginatedQuery<any>({
+    endpoint: "/employees/paged",
+    page,
+    limit: 25,
+    params: {
+      search: debouncedSearch || undefined,
+      status: statusFilter === "all" ? undefined : statusFilter,
+      department: departmentFilter === "all" ? undefined : departmentFilter,
+    },
+  })
+  const employees = data?.items || []
 
   const handleDelete = async (id: string) => {
     const result = await Swal.fire({
@@ -55,33 +56,42 @@ export default function Employees() {
 
     try {
       await api.delete(`/employees/${id}`)
-      await fetchEmployees()
+      await refetch()
       Swal.fire("Deleted!", "Employee has been deleted.", "success")
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to delete employee")
     }
   }
 
-  const openDetails = (employee: any) => {
-    setSelectedEmployee(employee)
-    setIsViewOpen(true)
+  const openDetails = async (employee: any) => {
+    try {
+      const response = await api.get(`/employees/${employee._id}`)
+      setSelectedEmployee(response.data.data)
+      setIsViewOpen(true)
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to fetch employee details")
+    }
   }
 
-  // Derive unique departments for filter dropdown
-  const uniqueDepartments = Array.from(new Set(employees.map(e => e.department).filter(Boolean))).sort()
-
-  const filteredEmployees = employees.filter((emp) => {
-    const matchesStatus = statusFilter === "all" || emp.status === statusFilter
-    const matchesDepartment = departmentFilter === "all" || emp.department === departmentFilter
-
-    return matchesStatus && matchesDepartment
-  })
+  const uniqueDepartments = (data?.facets?.departments as string[] | undefined) || []
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Employees" description="Create, assign, and manage employee records.">
         <div className="flex items-center gap-3">
-          <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+          <Input
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setPage(1)
+            }}
+            placeholder="Search employees..."
+            className="w-[220px]"
+          />
+          <Select value={departmentFilter} onValueChange={(value) => {
+            setDepartmentFilter(value)
+            setPage(1)
+          }}>
             <SelectTrigger className="w-[180px] bg-background">
               <SelectValue placeholder="All Departments" />
             </SelectTrigger>
@@ -92,7 +102,10 @@ export default function Employees() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(value) => {
+            setStatusFilter(value)
+            setPage(1)
+          }}>
             <SelectTrigger className="w-[150px] bg-background">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
@@ -126,7 +139,7 @@ export default function Employees() {
         <Card className="shadow-sm">
           <CardContent className="p-0">
             
-            {filteredEmployees.length === 0 ? (
+            {employees.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 No employees match your filters.
               </div>
@@ -144,7 +157,7 @@ export default function Employees() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredEmployees.map((employee) => (
+                    {employees.map((employee) => (
                     <TableRow key={employee._id}>
                       <TableCell>
                         <div className="font-medium">{employee.firstName} {employee.lastName}</div>
@@ -179,6 +192,9 @@ export default function Employees() {
             </div>
             )}
           </CardContent>
+          {data?.pagination && (
+            <DataPagination pagination={data.pagination} onPageChange={setPage} />
+          )}
         </Card>
       )}
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useSelector } from "react-redux"
 import { PageHeader } from "@/components/layout/PageHeader"
@@ -14,12 +14,17 @@ import type { RootState } from "@/store"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import Swal from "sweetalert2"
+import { Input } from "@/components/ui/input"
+import { DataPagination } from "@/components/shared/DataPagination"
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
+import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 
 export default function Companies() {
   const navigate = useNavigate()
   const { user } = useSelector((state: RootState) => state.auth)
-  const [companies, setCompanies] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState("")
+  const debouncedSearch = useDebouncedValue(search)
   
   // View Company State
   const [selectedCompany, setSelectedCompany] = useState<any | null>(null)
@@ -28,26 +33,26 @@ export default function Companies() {
   // Filters state
   const [statusFilter, setStatusFilter] = useState("all")
   const [cityFilter, setCityFilter] = useState("all")
+  const {
+    data,
+    isLoading: loading,
+    refetch: fetchCompanies,
+  } = usePaginatedQuery<any>({
+    endpoint: "/companies/paged",
+    page,
+    params: { search: debouncedSearch, status: statusFilter, city: cityFilter },
+  })
+  const companies = data?.items || []
+  const uniqueCities = (data?.facets?.cities as string[] | undefined) || []
 
-  useEffect(() => {
-    fetchCompanies()
-  }, [])
-
-  const fetchCompanies = async () => {
+  const handleView = async (company: any) => {
     try {
-      setLoading(true)
-      const res = await api.get('/companies')
-      setCompanies(res.data.data || [])
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to fetch companies")
-    } finally {
-      setLoading(false)
+      const response = await api.get(`/companies/${company._id}`)
+      setSelectedCompany(response.data.data)
+      setIsViewOpen(true)
+    } catch {
+      toast.error("Failed to load company details")
     }
-  }
-
-  const handleView = (company: any) => {
-    setSelectedCompany(company)
-    setIsViewOpen(true)
   }
 
   const canEdit = (company: any) => {
@@ -74,28 +79,24 @@ export default function Companies() {
           'The company has been deleted.',
           'success'
         )
-        fetchCompanies()
+        void fetchCompanies()
       } catch (err: any) {
         toast.error(err.response?.data?.message || "Failed to delete company")
       }
     }
   }
 
-  // Derive unique cities for filter dropdown
-  const uniqueCities = Array.from(new Set(companies.map(c => c.city).filter(Boolean))).sort()
-
-  const filteredCompanies = companies.filter((company) => {
-    const matchesStatus = statusFilter === "all" || company.leadStatus === statusFilter
-    const matchesCity = cityFilter === "all" || company.city === cityFilter
-
-    return matchesStatus && matchesCity
-  })
-
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Companies" description="Manage company profiles.">
         <div className="flex items-center gap-3">
-          <Select value={cityFilter} onValueChange={setCityFilter}>
+          <Input
+            value={search}
+            onChange={(event) => { setSearch(event.target.value); setPage(1) }}
+            placeholder="Search companies..."
+            className="w-[210px]"
+          />
+          <Select value={cityFilter} onValueChange={(value) => { setCityFilter(value); setPage(1) }}>
             <SelectTrigger className="w-[150px] bg-background">
               <SelectValue placeholder="All Cities" />
             </SelectTrigger>
@@ -106,7 +107,7 @@ export default function Companies() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1) }}>
             <SelectTrigger className="w-[180px] bg-background">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
@@ -143,7 +144,7 @@ export default function Companies() {
         <Card className="shadow-sm">
           <CardContent className="p-0">
 
-            {filteredCompanies.length === 0 ? (
+            {companies.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground">
                 No companies match your filters.
               </div>
@@ -161,7 +162,7 @@ export default function Companies() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredCompanies.map((company) => (
+                  {companies.map((company) => (
                     <TableRow key={company._id} className="hover:bg-muted/30">
                       <TableCell className="font-medium">
                         {company.companyName}
@@ -220,6 +221,7 @@ export default function Companies() {
               </Table>
             </div>
             )}
+            <DataPagination pagination={data?.pagination} onPageChange={setPage} />
           </CardContent>
         </Card>
       )}

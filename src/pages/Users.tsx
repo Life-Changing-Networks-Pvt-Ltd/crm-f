@@ -33,6 +33,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { DataPagination } from "@/components/shared/DataPagination"
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
+import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 
 interface UserData {
   _id: string;
@@ -55,9 +58,11 @@ interface RoleData {
 
 export default function Users() {
   const navigate = useNavigate()
-  const [users, setUsers] = useState<UserData[]>([])
   const [roles, setRoles] = useState<RoleData[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [managerOptions, setManagerOptions] = useState<UserData[]>([])
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState("")
+  const debouncedSearch = useDebouncedValue(search)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
@@ -73,6 +78,13 @@ export default function Users() {
   const [parent, setParent] = useState("")
   const [status, setStatus] = useState("active")
   const [showPassword, setShowPassword] = useState(false)
+  const { data, isLoading, refetch } = usePaginatedQuery<UserData>({
+    endpoint: "/users/paged",
+    page,
+    limit: 25,
+    params: { search: debouncedSearch || undefined },
+  })
+  const users = data?.items || []
 
   useEffect(() => {
     if (!currentUser) return; // Wait for hydration
@@ -80,28 +92,24 @@ export default function Users() {
       navigate({ to: '/' })
       return
     }
-    fetchData()
+    fetchReferenceData()
   }, [currentUser])
 
-  const fetchData = async () => {
+  const fetchReferenceData = async () => {
     try {
-      setIsLoading(true)
-      const [usersRes, rolesRes] = await Promise.all([
-        api.get('/users'),
-        api.get('/roles')
+      const [rolesRes, managersRes] = await Promise.all([
+        api.get('/roles'),
+        api.get('/users/options', { params: { purpose: "manager" } }),
       ])
-      
-      setUsers(usersRes.data.data)
       setRoles(rolesRes.data.data)
+      setManagerOptions(managersRes.data.data || [])
     } catch (error: any) {
       console.error("Failed to fetch data:", error)
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'Failed to load users and roles from the server.'
+        text: 'Failed to load roles and manager options from the server.'
       })
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -109,7 +117,7 @@ export default function Users() {
     setEditingUserId(u._id)
     setName(u.name)
     setEmail(u.email)
-    setPassword(u.password || "") // Pre-fill password
+    setPassword("")
     setRole(u.role)
     setPhone(u.phone || "")
     setParent(typeof u.parent === "string" ? u.parent : u.parent?._id || "")
@@ -147,8 +155,7 @@ export default function Users() {
 
       if (editingUserId) {
         // Update existing user
-        const res = await api.put(`/users/${editingUserId}`, payload)
-        setUsers(users.map(u => u._id === editingUserId ? res.data.data : u))
+        await api.put(`/users/${editingUserId}`, payload)
         Swal.fire({
           icon: 'success',
           title: 'User Updated',
@@ -158,8 +165,7 @@ export default function Users() {
         })
       } else {
         // Create new user
-        const res = await api.post('/users', payload)
-        setUsers([...users, res.data.data])
+        await api.post('/users', payload)
         Swal.fire({
           icon: 'success',
           title: 'User Created',
@@ -169,6 +175,7 @@ export default function Users() {
         })
       }
       
+      await Promise.all([refetch(), fetchReferenceData()])
       setIsDialogOpen(false)
     } catch (error: any) {
       console.error("Failed to save user:", error)
@@ -196,7 +203,7 @@ export default function Users() {
 
       if (result.isConfirmed) {
         await api.delete(`/users/${id}`)
-        setUsers(users.filter(u => u._id !== id))
+        await Promise.all([refetch(), fetchReferenceData()])
         Swal.fire(
           'Deleted!',
           'User has been deleted.',
@@ -313,7 +320,7 @@ export default function Users() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No parent</SelectItem>
-                    {users
+                    {managerOptions
                       .filter(u => u._id !== editingUserId)
                       .map(u => (
                         <SelectItem key={u._id} value={u._id}>{u.name} ({u.role})</SelectItem>
@@ -345,6 +352,16 @@ export default function Users() {
           </>
         )}
       </div>
+
+      <Input
+        value={search}
+        onChange={(event) => {
+          setSearch(event.target.value)
+          setPage(1)
+        }}
+        placeholder="Search users by name, email or role..."
+        className="max-w-sm"
+      />
 
       <div className="rounded-md border bg-card">
         <Table>
@@ -434,6 +451,9 @@ export default function Users() {
             )}
           </TableBody>
         </Table>
+        {data?.pagination && (
+          <DataPagination pagination={data.pagination} onPageChange={setPage} />
+        )}
       </div>
     </div>
   )

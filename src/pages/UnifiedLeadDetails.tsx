@@ -9,12 +9,31 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import api, { BACKEND_URL } from "@/services/api"
 import { toast } from "sonner"
 import { browserPhone } from "@/services/browserPhone"
 
+const dateTimeInputValue = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+const currentDateTimeInputValue = () => dateTimeInputValue(new Date())
+
+const savedDateTimeInputValue = (value?: string) => {
+  if (!value) return currentDateTimeInputValue()
+  const savedDate = new Date(value)
+  return Number.isNaN(savedDate.getTime())
+    ? currentDateTimeInputValue()
+    : dateTimeInputValue(savedDate)
+}
 
 export default function UnifiedLeadDetails() {
   const { type, id } = useParams({ strict: false }) as any
@@ -25,6 +44,7 @@ export default function UnifiedLeadDetails() {
   const [lead, setLead] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [statusUpdating, setStatusUpdating] = useState(false)
+  const [statusDate, setStatusDate] = useState(currentDateTimeInputValue)
   const [commentText, setCommentText] = useState("")
   const [commenting, setCommenting] = useState(false)
   const [attachment, setAttachment] = useState<File | null>(null)
@@ -68,7 +88,7 @@ export default function UnifiedLeadDetails() {
 
   const fetchUsers = async () => {
     try {
-      const res = await api.get('/users')
+      const res = await api.get('/leads/assignable-users')
       setUsers(res.data.data)
     } catch (err) {
       console.error("Failed to fetch users", err)
@@ -80,6 +100,7 @@ export default function UnifiedLeadDetails() {
       setLoading(true)
       const res = await api.get(`/leads/unified/${type}/${id}`)
       setLead(res.data.data)
+      setStatusDate(savedDateTimeInputValue(res.data.data?.leadStatusChangedAt))
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to fetch lead details")
       navigate({ to: '/leads/all' })
@@ -113,8 +134,15 @@ export default function UnifiedLeadDetails() {
   const handleStatusChange = async (newStatus: string) => {
     try {
       setStatusUpdating(true)
-      await api.put(`/leads/unified/${type}/${id}/status`, { status: newStatus })
-      setLead({ ...lead, leadStatus: newStatus })
+      await api.put(`/leads/unified/${type}/${id}/status`, {
+        status: newStatus,
+        statusDate: new Date(statusDate).toISOString(),
+      })
+      setLead({
+        ...lead,
+        leadStatus: newStatus,
+        leadStatusChangedAt: new Date(statusDate).toISOString(),
+      })
       toast.success("Status updated successfully")
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to update status")
@@ -344,7 +372,11 @@ export default function UnifiedLeadDetails() {
 
               <div className="flex flex-col gap-1.5">
                 <span className="text-muted-foreground block text-xs font-semibold uppercase">Lead Status</span>
-                <Select value={lead.leadStatus} onValueChange={handleStatusChange} disabled={statusUpdating}>
+                <Select
+                  value={lead.leadStatus}
+                  onValueChange={handleStatusChange}
+                  disabled={statusUpdating || !statusDate}
+                >
                   <SelectTrigger className="w-full">
                     {statusUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     <SelectValue placeholder="Select Status" />
@@ -377,6 +409,27 @@ export default function UnifiedLeadDetails() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label
+                  htmlFor="lead-status-date"
+                  className="text-muted-foreground block text-xs font-semibold uppercase"
+                >
+                  Status Date & Time
+                </label>
+                <Input
+                  id="lead-status-date"
+                  type="datetime-local"
+                  step={60}
+                  value={statusDate}
+                  onChange={(event) => setStatusDate(event.target.value)}
+                  disabled={statusUpdating}
+                  required
+                />
+                <span className="text-[11px] text-muted-foreground">
+                  This date and time will be saved with the next status change.
+                </span>
               </div>
             </CardContent>
           </Card>

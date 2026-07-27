@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react"
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
+import { useQuery } from "@tanstack/react-query"
 import api from "@/services/api"
+import { queryClient } from "@/lib/queryClient"
+import { crmQueryKeys, fetchNotificationSummary, type NotificationSummary } from "@/lib/crmQueries"
 // import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -13,47 +15,30 @@ import { SearchBar } from "./SearchBar"
 import { ThemeToggle } from "./ThemeToggle"
 import { UserDropdown } from "./UserDropdown"
 
-interface Notification {
-  _id: string;
-  title: string;
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
-  isRead: boolean;
-  createdAt: string;
-}
-
 export function AppNavbar() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const navigate = useNavigate();
+  const { data: summary = { items: [], unreadCount: 0 } } = useQuery({
+    queryKey: crmQueryKeys.notificationSummary,
+    queryFn: fetchNotificationSummary,
+    refetchInterval: 60_000,
+  });
 
-  const fetchNotifications = async () => {
-    try {
-      const res = await api.get('/notifications');
-      if (res.data?.success) {
-        setNotifications(res.data.data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch notifications", error);
-    }
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-    
-    // Set up a simple polling or interval to check for new notifications every minute
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const unreadCount = notifications.filter(n => !n.isRead).length;
-  const recentNotifications = notifications.slice(0, 5);
+  const unreadCount = summary.unreadCount;
+  const recentNotifications = summary.items;
 
   const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
       await api.put(`/notifications/${id}/read`);
-      setNotifications(notifications.map(n => n._id === id ? { ...n, isRead: true } : n));
-    } catch (error) {
+      queryClient.setQueryData<NotificationSummary>(
+        crmQueryKeys.notificationSummary,
+        (current) => current ? {
+          items: current.items.map(n => n._id === id ? { ...n, isRead: true } : n),
+          unreadCount: Math.max(0, current.unreadCount - (current.items.some(n => n._id === id && !n.isRead) ? 1 : 0)),
+        } : current,
+      );
+      void queryClient.invalidateQueries({ queryKey: ["paged", "/notifications/paged"] });
+    } catch {
       console.error("Failed to mark as read");
     }
   };

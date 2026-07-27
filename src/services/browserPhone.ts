@@ -1,10 +1,11 @@
-import Plivo from "plivo-browser-sdk"
+import type Plivo from "plivo-browser-sdk"
 import api from "@/services/api"
 
 export type PhoneStatus = "idle" | "connecting" | "ringing" | "in-call" | "ended" | "error"
 export type PhoneState = { status: PhoneStatus; leadName: string; muted: boolean; message?: string; callLogId?: string; connectedAt?: number }
 
 let sdk: Plivo | null = null
+let sdkPromise: Promise<Plivo> | null = null
 let loggedInUser = ""
 let state: PhoneState = { status: "idle", leadName: "", muted: false }
 const listeners = new Set<(value: PhoneState) => void>()
@@ -79,9 +80,11 @@ const publish = (patch: Partial<PhoneState>) => {
   listeners.forEach((listener) => listener(state))
 }
 
-const ensureSdk = () => {
+const ensureSdk = async (): Promise<Plivo> => {
   if (sdk) return sdk
-  sdk = new Plivo({ debug: "ERROR", permOnClick: true, enableTracking: true, closeProtection: true, clientRegion: "south_asia" })
+  if (!sdkPromise) {
+    sdkPromise = import("plivo-browser-sdk").then(({ default: PlivoSdk }) => {
+  sdk = new PlivoSdk({ debug: "ERROR", permOnClick: true, enableTracking: true, closeProtection: true, clientRegion: "south_asia" })
   const client = sdk.client
   const events = client as unknown as { on: (event: string, callback: (...args: unknown[]) => void) => void }
   events.on("onLogin", () => { loginResolve?.(); loginResolve = null; loginReject = null })
@@ -111,11 +114,17 @@ const ensureSdk = () => {
   events.on("onMediaPermission", (permission: unknown) => {
     if (String(permission).toLowerCase().includes("denied")) publish({ status: "error", message: "Microphone permission was denied" })
   })
-  return sdk
+      return sdk
+    }).catch((error) => {
+      sdkPromise = null
+      throw error
+    })
+  }
+  return sdkPromise
 }
 
 const login = async (username: string, password: string) => {
-  const instance = ensureSdk()
+  const instance = await ensureSdk()
   if (loggedInUser === username && instance.client.isLoggedIn) return
   if (loggedInUser && loggedInUser !== username) instance.client.logout()
   await new Promise<void>((resolve, reject) => {
@@ -153,7 +162,8 @@ export const browserPhone = {
       if (callLogId) startStatusPolling(callLogId)
       const { username, password, dialCode } = response.data.data.providerResponse
       await login(username, password)
-      const placed = ensureSdk().client.call(dialCode, { "X-PH-CRM": "browser" })
+      const instance = await ensureSdk()
+      const placed = instance.client.call(dialCode, { "X-PH-CRM": "browser" })
       if (!placed) throw new Error("Plivo could not start the browser call")
     } catch (error) {
       stopStatusPolling()

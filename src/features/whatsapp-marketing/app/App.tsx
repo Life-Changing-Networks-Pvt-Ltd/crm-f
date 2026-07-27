@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { lazy, Suspense } from "react";
 import { Switch, Route, Redirect, Router as WouterRouter, useLocation } from "wouter";
 import DashboardLayout from "@whatsapp/components/layout/DashboardLayout";
 import { Loader2 } from "lucide-react";
@@ -9,91 +10,78 @@ import { TooltipProvider } from "@whatsapp/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@whatsapp/contexts/AuthContext";
 import { installWhatsAppApiFetchAdapter } from "@whatsapp/lib/apiBase";
 import { fetchWithAuth } from "@whatsapp/lib/fetchWithAuth";
-import NotFound from "@whatsapp/pages/not-found";
-import Login from "@whatsapp/pages/Login";
-import ForgotPassword from "@whatsapp/pages/ForgotPassword";
-import ResetPassword from "@whatsapp/pages/ResetPassword";
-import SellersLoginLaunch from "@whatsapp/pages/SellersLoginLaunch";
-import WhatsAppAccountSetup from "@whatsapp/pages/WhatsAppAccountSetup";
-import Dashboard from "@whatsapp/pages/dashboard";
-import Inbox from "@whatsapp/pages/inbox";
-import WindowInbox from "@whatsapp/pages/inbox/WindowInbox";
-import WhatsAppLeads from "@whatsapp/pages/inbox/WhatsAppLeads";
-import Campaigns from "@whatsapp/pages/campaigns";
-import Automation from "@whatsapp/pages/automation";
-import Contacts from "@whatsapp/pages/contacts";
-import Settings from "@whatsapp/pages/settings";
-import TeamMembers from "@whatsapp/pages/settings/TeamMembers";
-import Permissions from "@whatsapp/pages/settings/Permissions";
-import WhatsAppNumber from "@whatsapp/pages/settings/WhatsAppNumber";
-import ProfileDetails from "@whatsapp/pages/settings/ProfileDetails";
-import WebhookAPI from "@whatsapp/pages/settings/WebhookAPI";
-import WebhookEvents from "@whatsapp/pages/settings/WebhookEvents";
-
-import Templates from "@whatsapp/pages/templates";
-
-// New Imports
-import Broadcast from "@whatsapp/pages/campaigns/Broadcast";
-import SelectedContacts from "@whatsapp/pages/campaigns/SelectedContacts";
-import Schedule from "@whatsapp/pages/campaigns/Schedule";
-import Single from "@whatsapp/pages/campaigns/Single";
-import Report from "@whatsapp/pages/campaigns/Report";
-import CampaignPage from "@whatsapp/pages/campaigns/CampaignPage";
-
-import AutoLeads from "@whatsapp/pages/automation/AutoLeads";
-import Keywords from "@whatsapp/pages/automation/Keywords";
-import FollowUp from "@whatsapp/pages/automation/FollowUp";
-import Drip from "@whatsapp/pages/automation/Drip";
-import NewLeads from "@whatsapp/pages/automation/NewLeads";
-import AutomationDashboard from "@whatsapp/pages/automation/AutomationDashboard";
-import TriggersPage from "@whatsapp/pages/automation/TriggersPage";
-import FlowsPage from "@whatsapp/pages/automation/FlowsPage";
-import FlowEditor from "@whatsapp/pages/automation/FlowEditor";
-import CampaignsPage from "@whatsapp/pages/automation/CampaignsPage";
-import SegmentsPage from "@whatsapp/pages/automation/SegmentsPage";
-import AnalyticsPage from "@whatsapp/pages/automation/AnalyticsPage";
-import InterestLists from "@whatsapp/pages/automation/InterestLists";
-
-import ConnectApps from "@whatsapp/pages/apps/ConnectApps";
-
-import AddTemplate from "@whatsapp/pages/templates/AddTemplate";
-import TemplateStatus from "@whatsapp/pages/templates/TemplateStatus";
-import ManageTemplates from "@whatsapp/pages/templates/ManageTemplates";
-
-import NewAgent from "@whatsapp/pages/ai/NewAgent";
-import ManageAgents from "@whatsapp/pages/ai/ManageAgents";
-import AgentsPage from "@whatsapp/pages/ai/AgentsPage";
-import MapAgent from "@whatsapp/pages/ai/MapAgent";
-import AgentReports from "@whatsapp/pages/ai/AgentReports";
-import PrefilledTextMappings from "@whatsapp/pages/ai/PrefilledTextMappings";
-
-import LeadForms from "@whatsapp/pages/facebook/LeadForms";
-import Leads from "@whatsapp/pages/facebook/Leads";
-
-import DeliveryReport from "@whatsapp/pages/reports/DeliveryReport";
-import CampaignPerformance from "@whatsapp/pages/reports/CampaignPerformance";
-import CustomerReplies from "@whatsapp/pages/reports/CustomerReplies";
-import AgentPerformance from "@whatsapp/pages/reports/AgentPerformance";
-import Credits from "@whatsapp/pages/reports/Credits";
-import UserEngagement from "@whatsapp/pages/reports/UserEngagement";
-import BroadcastReports from "@whatsapp/pages/reports/BroadcastReports";
-import SingleMessageReports from "@whatsapp/pages/SingleMessageReports";
-import BlockedContacts from "@whatsapp/pages/reports/BlockedContacts";
-import ContactReports from "@whatsapp/pages/reports/ContactReports";
-import UserManagement from "@whatsapp/pages/UserManagement";
-import LeadAssignmentReports from "@whatsapp/pages/lead-assignment-reports";
-import UserActivityReports from "@whatsapp/pages/user-activity-reports";
-import ContactUsageDetail from "./pages/ContactUsageDetails";
-import AiUsageDashboard from "./pages/AiUsageDashboard";
-import UserManagementDashboard from "./pages/UserManagementDashboard";
-import Register from "./pages/Register";
-import FBLeadAutomationReport from "./pages/FbleadsReport";
-import DripCampaignReport from "./pages/DripCampaignReport";
-import WhatsAppFlowReport from "./pages/WhatsAppFlowReport";
-import MessageUsage from "./pages/usage/MessageUsage";
-import TemplateUsage from "./pages/usage/TemplateUsage";
-import PricingUsage from "./pages/usage/PricingUsage";
-import MetaFlows from "./pages/MetaFlows";
+const NotFound = lazy(() => import("@whatsapp/pages/not-found"));
+const Login = lazy(() => import("@whatsapp/pages/Login"));
+const ForgotPassword = lazy(() => import("@whatsapp/pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("@whatsapp/pages/ResetPassword"));
+const SellersLoginLaunch = lazy(() => import("@whatsapp/pages/SellersLoginLaunch"));
+const WhatsAppAccountSetup = lazy(() => import("@whatsapp/pages/WhatsAppAccountSetup"));
+const Dashboard = lazy(() => import("@whatsapp/pages/dashboard"));
+const Inbox = lazy(() => import("@whatsapp/pages/inbox"));
+const WindowInbox = lazy(() => import("@whatsapp/pages/inbox/WindowInbox"));
+const WhatsAppLeads = lazy(() => import("@whatsapp/pages/inbox/WhatsAppLeads"));
+const Campaigns = lazy(() => import("@whatsapp/pages/campaigns"));
+const Automation = lazy(() => import("@whatsapp/pages/automation"));
+const Contacts = lazy(() => import("@whatsapp/pages/contacts"));
+const Settings = lazy(() => import("@whatsapp/pages/settings"));
+const ProfileDetails = lazy(() => import("@whatsapp/pages/settings/ProfileDetails"));
+const WebhookAPI = lazy(() => import("@whatsapp/pages/settings/WebhookAPI"));
+const WebhookEvents = lazy(() => import("@whatsapp/pages/settings/WebhookEvents"));
+const Templates = lazy(() => import("@whatsapp/pages/templates"));
+const Broadcast = lazy(() => import("@whatsapp/pages/campaigns/Broadcast"));
+const SelectedContacts = lazy(() => import("@whatsapp/pages/campaigns/SelectedContacts"));
+const Schedule = lazy(() => import("@whatsapp/pages/campaigns/Schedule"));
+const Single = lazy(() => import("@whatsapp/pages/campaigns/Single"));
+const Report = lazy(() => import("@whatsapp/pages/campaigns/Report"));
+const CampaignPage = lazy(() => import("@whatsapp/pages/campaigns/CampaignPage"));
+const AutoLeads = lazy(() => import("@whatsapp/pages/automation/AutoLeads"));
+const Keywords = lazy(() => import("@whatsapp/pages/automation/Keywords"));
+const FollowUp = lazy(() => import("@whatsapp/pages/automation/FollowUp"));
+const Drip = lazy(() => import("@whatsapp/pages/automation/Drip"));
+const NewLeads = lazy(() => import("@whatsapp/pages/automation/NewLeads"));
+const AutomationDashboard = lazy(() => import("@whatsapp/pages/automation/AutomationDashboard"));
+const TriggersPage = lazy(() => import("@whatsapp/pages/automation/TriggersPage"));
+const FlowsPage = lazy(() => import("@whatsapp/pages/automation/FlowsPage"));
+const FlowEditor = lazy(() => import("@whatsapp/pages/automation/FlowEditor"));
+const CampaignsPage = lazy(() => import("@whatsapp/pages/automation/CampaignsPage"));
+const SegmentsPage = lazy(() => import("@whatsapp/pages/automation/SegmentsPage"));
+const AnalyticsPage = lazy(() => import("@whatsapp/pages/automation/AnalyticsPage"));
+const InterestLists = lazy(() => import("@whatsapp/pages/automation/InterestLists"));
+const ConnectApps = lazy(() => import("@whatsapp/pages/apps/ConnectApps"));
+const AddTemplate = lazy(() => import("@whatsapp/pages/templates/AddTemplate"));
+const TemplateStatus = lazy(() => import("@whatsapp/pages/templates/TemplateStatus"));
+const ManageTemplates = lazy(() => import("@whatsapp/pages/templates/ManageTemplates"));
+const NewAgent = lazy(() => import("@whatsapp/pages/ai/NewAgent"));
+const AgentsPage = lazy(() => import("@whatsapp/pages/ai/AgentsPage"));
+const MapAgent = lazy(() => import("@whatsapp/pages/ai/MapAgent"));
+const AgentReports = lazy(() => import("@whatsapp/pages/ai/AgentReports"));
+const PrefilledTextMappings = lazy(() => import("@whatsapp/pages/ai/PrefilledTextMappings"));
+const LeadForms = lazy(() => import("@whatsapp/pages/facebook/LeadForms"));
+const Leads = lazy(() => import("@whatsapp/pages/facebook/Leads"));
+const DeliveryReport = lazy(() => import("@whatsapp/pages/reports/DeliveryReport"));
+const CampaignPerformance = lazy(() => import("@whatsapp/pages/reports/CampaignPerformance"));
+const CustomerReplies = lazy(() => import("@whatsapp/pages/reports/CustomerReplies"));
+const AgentPerformance = lazy(() => import("@whatsapp/pages/reports/AgentPerformance"));
+const Credits = lazy(() => import("@whatsapp/pages/reports/Credits"));
+const UserEngagement = lazy(() => import("@whatsapp/pages/reports/UserEngagement"));
+const BroadcastReports = lazy(() => import("@whatsapp/pages/reports/BroadcastReports"));
+const SingleMessageReports = lazy(() => import("@whatsapp/pages/SingleMessageReports"));
+const BlockedContacts = lazy(() => import("@whatsapp/pages/reports/BlockedContacts"));
+const ContactReports = lazy(() => import("@whatsapp/pages/reports/ContactReports"));
+const UserManagement = lazy(() => import("@whatsapp/pages/UserManagement"));
+const LeadAssignmentReports = lazy(() => import("@whatsapp/pages/lead-assignment-reports"));
+const UserActivityReports = lazy(() => import("@whatsapp/pages/user-activity-reports"));
+const ContactUsageDetail = lazy(() => import("./pages/ContactUsageDetails"));
+const AiUsageDashboard = lazy(() => import("./pages/AiUsageDashboard"));
+const UserManagementDashboard = lazy(() => import("./pages/UserManagementDashboard"));
+const Register = lazy(() => import("./pages/Register"));
+const FBLeadAutomationReport = lazy(() => import("./pages/FbleadsReport"));
+const DripCampaignReport = lazy(() => import("./pages/DripCampaignReport"));
+const WhatsAppFlowReport = lazy(() => import("./pages/WhatsAppFlowReport"));
+const MessageUsage = lazy(() => import("./pages/usage/MessageUsage"));
+const TemplateUsage = lazy(() => import("./pages/usage/TemplateUsage"));
+const PricingUsage = lazy(() => import("./pages/usage/PricingUsage"));
+const MetaFlows = lazy(() => import("./pages/MetaFlows"));
 
 installWhatsAppApiFetchAdapter();
 function ProtectedRoute({
@@ -447,7 +435,15 @@ function App() {
           <Toaster />
           <WouterRouter base="/whatsapp-marketing">
             <div className="whatsapp-marketing-app min-h-screen w-full">
-              <MainApp />
+              <Suspense
+                fallback={
+                  <div className="flex min-h-[50vh] w-full items-center justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                }
+              >
+                <MainApp />
+              </Suspense>
             </div>
           </WouterRouter>
         </TooltipProvider>

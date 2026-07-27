@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Checkbox } from "@/components/ui/checkbox"
 import api from "@/services/api"
 import { toast } from "sonner"
+import { DataPagination } from "@/components/shared/DataPagination"
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
 
 interface UnifiedLead {
   _id: string;
@@ -36,8 +38,7 @@ export default function AllLeads() {
   const navigate = useNavigate()
   const searchParams = useSearch({ strict: false }) as any
   
-  const [leads, setLeads] = useState<UnifiedLead[]>([])
-  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
   const [typeFilter, setTypeFilter] = useState("All")
   const [dateFilter, setDateFilter] = useState("All")
   const [statusFilter, setStatusFilter] = useState(searchParams?.status || "All")
@@ -51,27 +52,27 @@ export default function AllLeads() {
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([])
   const [selectedAssignee, setSelectedAssignee] = useState("")
   const [assigning, setAssigning] = useState(false)
+  const { data, isLoading: loading, refetch } = usePaginatedQuery<UnifiedLead>({
+    endpoint: "/leads/all/paged",
+    page,
+    limit: 25,
+    params: {
+      type: typeFilter === "All" ? undefined : typeFilter,
+      date: dateFilter === "All" ? undefined : dateFilter,
+      status: statusFilter === "All" ? undefined : statusFilter,
+      followUp: searchParams?.followUp,
+    },
+  })
+  const filteredLeads = data?.items || []
 
   useEffect(() => {
-    fetchLeads()
     fetchAssignableUsers()
   }, [])
 
   useEffect(() => {
     setStatusFilter(searchParams?.status || "All")
+    setPage(1)
   }, [searchParams?.status])
-
-  const fetchLeads = async () => {
-    try {
-      setLoading(true)
-      const res = await api.get('/leads/all')
-      setLeads(res.data.data)
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to fetch leads")
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const fetchAssignableUsers = async () => {
     try {
@@ -157,38 +158,13 @@ export default function AllLeads() {
       toast.success(res.data.message || "Leads assigned successfully")
       setSelectedLeadKeys([])
       setSelectedAssignee("")
-      fetchLeads()
+      await refetch()
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to assign leads")
     } finally {
       setAssigning(false)
     }
   }
-
-  const filteredLeads = leads.filter(lead => {
-    const matchesType = typeFilter === "All" || lead.type === typeFilter
-    const matchesStatus = statusFilter === "All" || lead.leadStatus === statusFilter
-    
-    let matchesDate = true;
-    let matchesFollowUp = true;
-    if (dateFilter !== "All") {
-      const leadDate = new Date(lead.createdAt);
-      const today = new Date();
-      if (dateFilter === "Today") {
-        matchesDate = leadDate.toDateString() === today.toDateString();
-      } else if (dateFilter === "This Week") {
-        const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
-        matchesDate = leadDate >= firstDay;
-      } else if (dateFilter === "This Month") {
-        matchesDate = leadDate.getMonth() === today.getMonth() && leadDate.getFullYear() === today.getFullYear();
-      }
-    }
-    if (searchParams?.followUp === "upcoming") {
-      matchesFollowUp = lead.leadStatus === "Follow Up";
-    }
-
-    return matchesType && matchesDate && matchesStatus && matchesFollowUp
-  })
 
   const visibleSelectedCount = filteredLeads.filter((lead) => selectedLeadKeys.includes(getLeadKey(lead))).length
   const allVisibleSelected = filteredLeads.length > 0 && visibleSelectedCount === filteredLeads.length
@@ -197,7 +173,10 @@ export default function AllLeads() {
     <div className="flex flex-col gap-6">
       <PageHeader title="All Unified Leads" description="View and filter all your Companies and Customers.">
         <div className="flex items-center gap-3">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(value) => {
+            setStatusFilter(value)
+            setPage(1)
+          }}>
             <SelectTrigger className="w-[140px] bg-background">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -214,7 +193,10 @@ export default function AllLeads() {
             </SelectContent>
           </Select>
 
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <Select value={typeFilter} onValueChange={(value) => {
+            setTypeFilter(value)
+            setPage(1)
+          }}>
             <SelectTrigger className="w-[140px] bg-background">
               <SelectValue placeholder="Lead Type" />
             </SelectTrigger>
@@ -225,7 +207,10 @@ export default function AllLeads() {
             </SelectContent>
           </Select>
 
-          <Select value={dateFilter} onValueChange={setDateFilter}>
+          <Select value={dateFilter} onValueChange={(value) => {
+            setDateFilter(value)
+            setPage(1)
+          }}>
             <SelectTrigger className="w-[140px] bg-background">
               <SelectValue placeholder="Date Added" />
             </SelectTrigger>
@@ -356,6 +341,9 @@ export default function AllLeads() {
             </TableBody>
           </Table>
         </div>
+        {data?.pagination && (
+          <DataPagination pagination={data.pagination} onPageChange={setPage} />
+        )}
       </div>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>

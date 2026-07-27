@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useMemo, useState } from "react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Plus, ChevronLeft, ChevronRight, Loader2, Calendar as CalendarIcon, Trash2 } from "lucide-react"
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -28,9 +29,6 @@ interface Task {
 
 export default function Calendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [events, setEvents] = useState<Event[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(false);
   
   // Dialog state
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -41,26 +39,29 @@ export default function Calendar() {
     type: 'Meeting'
   });
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [eventsRes, tasksRes] = await Promise.all([
-        api.get('/events'),
-        api.get('/tasks')
-      ]);
-      
-      if (eventsRes.data?.success) setEvents(eventsRes.data.data);
-      if (tasksRes.data?.success) setTasks(tasksRes.data.data);
-    } catch (error) {
-      console.error("Failed to fetch data", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
+  const range = useMemo(() => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    return {
+      startDate: new Date(year, month, 1).toLocaleDateString('en-CA'),
+      endDate: new Date(year, month + 1, 0).toLocaleDateString('en-CA'),
+    };
+  }, [currentDate]);
+  const eventsQuery = usePaginatedQuery<Event>({
+    endpoint: "/events/paged",
+    page: 1,
+    limit: 100,
+    params: range,
+  });
+  const tasksQuery = usePaginatedQuery<Task>({
+    endpoint: "/tasks/paged",
+    page: 1,
+    limit: 100,
+    params: range,
+  });
+  const events = eventsQuery.data?.items || [];
+  const tasks = tasksQuery.data?.items || [];
+  const loading = eventsQuery.isLoading || tasksQuery.isLoading;
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,7 +75,7 @@ export default function Calendar() {
       toast.success("Event added successfully");
       setIsAddOpen(false);
       setNewEvent({ ...newEvent, title: '' }); // reset title
-      fetchData();
+      await Promise.all([eventsQuery.refetch(), tasksQuery.refetch()]);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to add event");
     } finally {
@@ -99,7 +100,7 @@ export default function Calendar() {
     try {
       await api.delete(`/events/${id}`);
       toast.success("Event deleted");
-      setEvents(events.filter(ev => ev._id !== id));
+      await eventsQuery.refetch();
     } catch (err: any) {
       toast.error("Failed to delete event");
     }

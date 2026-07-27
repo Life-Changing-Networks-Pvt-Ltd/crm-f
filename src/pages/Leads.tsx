@@ -6,12 +6,11 @@ import { Plus, Users, ThumbsUp, ThumbsDown, Target, CalendarDays, Handshake, Che
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import api from "@/services/api"
 import { toast } from "sonner"
+import { useLeadStats } from "@/hooks/useLeadStats"
 
 export default function Leads() {
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(true)
   const [statsPeriod, setStatsPeriod] = useState("all")
   const today = new Date().toISOString().split("T")[0]
   const currentMonth = today.slice(0, 7)
@@ -19,6 +18,7 @@ export default function Leads() {
   const [dateRange, setDateRange] = useState({ startDate: today, endDate: today })
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [selectedYear, setSelectedYear] = useState(currentYear)
+  const [yearInput, setYearInput] = useState(currentYear)
   const startDateRef = useRef<HTMLInputElement>(null)
   const endDateRef = useRef<HTMLInputElement>(null)
   const monthRef = useRef<HTMLInputElement>(null)
@@ -34,30 +34,31 @@ export default function Leads() {
     followUp: 0
   }
 
-  const [apiStats, setApiStats] = useState(defaultStats)
+  const {
+    data,
+    isLoading: loading,
+    error,
+  } = useLeadStats({
+    period: statsPeriod,
+    startDate: dateRange.startDate,
+    endDate: dateRange.endDate,
+    month: selectedMonth,
+    year: selectedYear,
+  })
+  const apiStats = { ...defaultStats, ...(data || {}) }
 
   useEffect(() => {
-    fetchStats()
-  }, [statsPeriod, dateRange.startDate, dateRange.endDate, selectedMonth, selectedYear])
+    if (error) {
+      const requestError = error as { response?: { data?: { message?: string } } }
+      toast.error(requestError.response?.data?.message || "Failed to fetch lead stats")
+    }
+  }, [error])
 
-  const fetchStats = async () => {
-    try {
-      setLoading(true)
-      const params: Record<string, string> = { period: statsPeriod }
-      if (statsPeriod === "date") {
-        params.startDate = dateRange.startDate
-        params.endDate = dateRange.endDate
-      } else if (statsPeriod === "month") {
-        params.month = selectedMonth
-      } else if (statsPeriod === "year") {
-        params.year = selectedYear
-      }
-      const res = await api.get('/leads/stats', { params })
-      setApiStats({ ...defaultStats, ...(res.data.data || {}) })
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to fetch lead stats")
-    } finally {
-      setLoading(false)
+  const commitYear = () => {
+    if (/^\d{4}$/.test(yearInput) && Number(yearInput) >= 1900 && Number(yearInput) <= 2100) {
+      setSelectedYear(yearInput)
+    } else {
+      setYearInput(selectedYear)
     }
   }
 
@@ -120,8 +121,12 @@ export default function Leads() {
               type="number"
               min="1900"
               max="2100"
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
+              value={yearInput}
+              onChange={(e) => setYearInput(e.target.value)}
+              onBlur={commitYear}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur()
+              }}
               className="w-[110px]"
             />
           )}

@@ -11,6 +11,12 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 
+interface RoleData {
+  _id: string
+  name: string
+  level: string
+}
+
 const EMPTY_FORM = {
   firstName: "",
   lastName: "",
@@ -21,6 +27,7 @@ const EMPTY_FORM = {
   dateOfBirth: "",
   gender: "",
   designation: "",
+  role: "",
   department: "",
   employmentType: "Full-time",
   joiningDate: "",
@@ -76,6 +83,7 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
   const { employeeId } = useParams({ strict: false }) as any
   const [formData, setFormData] = useState(EMPTY_FORM)
   const [teamLeaders, setTeamLeaders] = useState<any[]>([])
+  const [roles, setRoles] = useState<RoleData[]>([])
   const [generatedId, setGeneratedId] = useState("")
   const [loading, setLoading] = useState(mode === "edit")
   const [submitting, setSubmitting] = useState(false)
@@ -83,6 +91,7 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
 
   useEffect(() => {
     fetchTeamLeaders()
+    fetchRoles()
     if (mode === "edit" && employeeId) {
       fetchEmployee(employeeId)
     }
@@ -94,6 +103,26 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
       setTeamLeaders(res.data.data || [])
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to load team leaders")
+    }
+  }
+
+  const fetchRoles = async () => {
+    try {
+      const res = await api.get("/roles")
+      const availableRoles: RoleData[] = res.data.data || []
+      setRoles(availableRoles)
+
+      if (mode === "create") {
+        const employeeRole = availableRoles.find(
+          (role) => role.name.trim().toLowerCase() === "employee"
+        )
+        setFormData((prev) => ({
+          ...prev,
+          role: prev.role || employeeRole?.name || "",
+        }))
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to load roles")
     }
   }
 
@@ -113,6 +142,7 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
         dateOfBirth: formatDate(employee.dateOfBirth),
         gender: employee.gender || "",
         designation: employee.designation || "",
+        role: employee.user?.role || "employee",
         department: employee.department || "",
         employmentType: employee.employmentType || "Full-time",
         joiningDate: formatDate(employee.joiningDate),
@@ -166,7 +196,7 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.designation || !formData.department || !formData.joiningDate || (mode === "create" && !formData.password)) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.designation || !formData.role || !formData.department || !formData.joiningDate || (mode === "create" && !formData.password)) {
       toast.error("Please fill all required fields (*)")
       return
     }
@@ -194,7 +224,7 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
   }
 
   const fillTestData = () => {
-    setFormData({
+    setFormData((prev) => ({
       firstName: "John",
       lastName: "Doe",
       email: "john.doe@example.com",
@@ -204,6 +234,7 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
       dateOfBirth: "1990-01-01",
       gender: "Male",
       designation: "Software Engineer",
+      role: prev.role || roles.find((role) => role.name.trim().toLowerCase() === "employee")?.name || "",
       department: "Engineering",
       employmentType: "Full-time",
       joiningDate: new Date().toISOString().split("T")[0],
@@ -231,7 +262,7 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
         ifscCode: "CHAS0123456",
       },
       notes: "Sample test data for employee creation.",
-    });
+    }));
   };
 
   if (loading) {
@@ -352,6 +383,35 @@ export default function EmployeeForm({ mode }: { mode: "create" | "edit" }) {
             <div className="space-y-2">
               <Label htmlFor="designation">Designation <span className="text-destructive">*</span></Label>
               <Input id="designation" value={formData.designation} onChange={(e) => setField("designation", e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">Assign Role <span className="text-destructive">*</span></Label>
+              <Select value={formData.role} onValueChange={(value) => setField("role", value)}>
+                <SelectTrigger id="role">
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {formData.role && !roles.some((role) => role.name === formData.role) && (
+                    <SelectItem value={formData.role}>
+                      {formData.role} (Current role)
+                    </SelectItem>
+                  )}
+                  {roles.length === 0 && !formData.role ? (
+                    <SelectItem value="no-roles-available" disabled>
+                      No roles available. Create a role first.
+                    </SelectItem>
+                  ) : (
+                    roles.map((role) => (
+                      <SelectItem key={role._id} value={role.name}>
+                        {role.name} ({role.level})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Controls login access and uses permissions configured in Page Access.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="department">Department <span className="text-destructive">*</span></Label>

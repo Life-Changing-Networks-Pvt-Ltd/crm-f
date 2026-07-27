@@ -1,39 +1,22 @@
-import { useState, useEffect } from "react"
+import { useEffect } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { motion } from "framer-motion"
 import { PinOff, Trash2 } from "lucide-react"
 import api from "@/services/api"
+import { queryClient } from "@/lib/queryClient"
+import { crmQueryKeys, fetchStickyNotes, type CrmNote } from "@/lib/crmQueries"
 import { toast } from "sonner"
 import Swal from "sweetalert2"
 
-interface Note {
-  _id: string;
-  title: string;
-  content: string;
-  color: string;
-  isSticky: boolean;
-  positionX: number;
-  positionY: number;
-}
-
 export function GlobalStickyNotes() {
-  const [stickyNotes, setStickyNotes] = useState<Note[]>([]);
-
-  const fetchStickyNotes = async () => {
-    try {
-      const res = await api.get('/notes');
-      if (res.data?.success) {
-        setStickyNotes(res.data.data.filter((n: Note) => n.isSticky));
-      }
-    } catch (error) {
-      console.error("Failed to fetch sticky notes", error);
-    }
-  };
+  const { data: stickyNotes = [], refetch } = useQuery({
+    queryKey: crmQueryKeys.stickyNotes,
+    queryFn: fetchStickyNotes,
+  });
 
   useEffect(() => {
-    fetchStickyNotes();
-
     const handleNotesUpdate = () => {
-      fetchStickyNotes();
+      void queryClient.invalidateQueries({ queryKey: crmQueryKeys.stickyNotes });
     };
 
     window.addEventListener('notes-updated', handleNotesUpdate);
@@ -43,7 +26,7 @@ export function GlobalStickyNotes() {
     };
   }, []);
 
-  const handleDragEnd = async (_e: any, info: any, note: Note) => {
+  const handleDragEnd = async (_e: any, info: any, note: CrmNote) => {
     // Only update if moved significantly
     if (Math.abs(info.offset.x) > 2 || Math.abs(info.offset.y) > 2) {
       let newX = note.positionX + info.offset.x;
@@ -57,7 +40,10 @@ export function GlobalStickyNotes() {
       newY = Math.max(10, Math.min(newY, maxHeight));
 
       try {
-        setStickyNotes(stickyNotes.map(n => n._id === note._id ? { ...n, positionX: newX, positionY: newY } : n));
+        queryClient.setQueryData<CrmNote[]>(
+          crmQueryKeys.stickyNotes,
+          (current = []) => current.map(n => n._id === note._id ? { ...n, positionX: newX, positionY: newY } : n),
+        );
         await api.put(`/notes/${note._id}`, { positionX: newX, positionY: newY });
         // Optionally dispatch event if other components need to know position changed, but not strictly necessary here.
       } catch (error) {
@@ -66,14 +52,18 @@ export function GlobalStickyNotes() {
     }
   };
 
-  const toggleSticky = async (note: Note) => {
+  const toggleSticky = async (note: CrmNote) => {
     try {
-      setStickyNotes(stickyNotes.filter(n => n._id !== note._id));
+      queryClient.setQueryData<CrmNote[]>(
+        crmQueryKeys.stickyNotes,
+        (current = []) => current.filter(n => n._id !== note._id),
+      );
       await api.put(`/notes/${note._id}`, { isSticky: false });
+      void queryClient.invalidateQueries({ queryKey: ["paged", "/notes/paged"] });
       window.dispatchEvent(new Event('notes-updated')); // Notify Notes.tsx to re-fetch grid
-    } catch (err) {
+    } catch {
       toast.error("Failed to unpin note");
-      fetchStickyNotes(); // revert
+      void refetch(); // revert
     }
   };
 
@@ -90,13 +80,17 @@ export function GlobalStickyNotes() {
     
     if (!result.isConfirmed) return;
     try {
-      setStickyNotes(stickyNotes.filter(n => n._id !== id));
+      queryClient.setQueryData<CrmNote[]>(
+        crmQueryKeys.stickyNotes,
+        (current = []) => current.filter(n => n._id !== id),
+      );
       await api.delete(`/notes/${id}`);
+      void queryClient.invalidateQueries({ queryKey: ["paged", "/notes/paged"] });
       toast.success("Note deleted");
       window.dispatchEvent(new Event('notes-updated')); // Notify Notes.tsx to re-fetch
-    } catch (err: any) {
+    } catch {
       toast.error("Failed to delete note");
-      fetchStickyNotes(); // revert
+      void refetch(); // revert
     }
   };
 

@@ -34,12 +34,8 @@ export default function AttendanceReports() {
 
   const fetchEmployees = async () => {
     try {
-      await api.get('/users?role=employee')
-      // If we don't have a role filter in /users endpoint, we can just fetch all users and filter locally.
-      // But let's assume it brings all for now or we just fetch all users.
-      const usersRes = await api.get('/users')
-      const filtered = usersRes.data.data.filter((u: any) => u.role !== 'admin')
-      setEmployees(filtered)
+      const usersRes = await api.get('/users/options', { params: { purpose: 'attendance' } })
+      setEmployees(usersRes.data.data || [])
     } catch (err) {
       console.log("Failed to fetch employees")
     }

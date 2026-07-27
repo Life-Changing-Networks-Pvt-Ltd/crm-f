@@ -1,8 +1,12 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Plus, Loader2, Trash2, Pin } from "lucide-react"
 import api from "@/services/api"
+import { queryClient } from "@/lib/queryClient"
+import { crmQueryKeys, type CrmNote } from "@/lib/crmQueries"
+import { DataPagination } from "@/components/shared/DataPagination"
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
 import { toast } from "sonner"
 import Swal from "sweetalert2"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
@@ -11,19 +15,18 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
 
-interface Note {
-  _id: string;
-  title: string;
-  content: string;
-  color: string;
-  isSticky: boolean;
-  positionX: number;
-  positionY: number;
-}
-
 export default function Notes() {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const {
+    data,
+    isLoading: loading,
+    refetch: refetchNotes,
+  } = usePaginatedQuery<CrmNote>({
+    endpoint: "/notes/paged",
+    page,
+    limit: 25,
+  });
+  const notes = data?.items || [];
   
   // Dialog state
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -33,26 +36,6 @@ export default function Notes() {
     content: '',
     color: '#fef3c7'
   });
-
-  const fetchNotes = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/notes');
-      if (res.data?.success) {
-        setNotes(res.data.data.filter((n: Note) => !n.isSticky));
-      }
-    } catch (error) {
-      console.error("Failed to fetch notes", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchNotes();
-    window.addEventListener('notes-updated', fetchNotes);
-    return () => window.removeEventListener('notes-updated', fetchNotes);
-  }, []);
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,8 +49,7 @@ export default function Notes() {
       toast.success("Note added successfully");
       setIsAddOpen(false);
       setNewNote({ title: '', content: '', color: '#fef3c7' });
-      fetchNotes();
-      window.dispatchEvent(new Event('notes-updated'));
+      await refetchNotes();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to add note");
     } finally {
@@ -89,24 +71,27 @@ export default function Notes() {
     if (!result.isConfirmed) return;
     try {
       await api.delete(`/notes/${id}`);
-      setNotes(notes.filter(n => n._id !== id));
+      await refetchNotes();
       toast.success("Note deleted");
       window.dispatchEvent(new Event('notes-updated'));
-    } catch (err: any) {
+    } catch {
       toast.error("Failed to delete note");
     }
   };
 
-  const toggleSticky = async (note: Note) => {
+  const toggleSticky = async (note: CrmNote) => {
     try {
       const updatedNote = { ...note, isSticky: !note.isSticky };
       // Optimistic UI update
-      setNotes(notes.filter(n => n._id !== note._id));
       await api.put(`/notes/${note._id}`, { isSticky: updatedNote.isSticky });
+      await Promise.all([
+        refetchNotes(),
+        queryClient.invalidateQueries({ queryKey: crmQueryKeys.stickyNotes }),
+      ]);
       window.dispatchEvent(new Event('notes-updated'));
-    } catch (err) {
+    } catch {
       toast.error("Failed to update note status");
-      fetchNotes(); // revert
+      void refetchNotes(); // revert
     }
   };
 
@@ -154,6 +139,9 @@ export default function Notes() {
         <div className="flex flex-col items-center justify-center p-20 text-muted-foreground border-2 border-dashed rounded-xl z-10 relative">
           <p>No notes found. Create your first note!</p>
         </div>
+      )}
+      {data?.pagination && (
+        <DataPagination pagination={data.pagination} onPageChange={setPage} />
       )}
 
       {/* Add Note Dialog */}

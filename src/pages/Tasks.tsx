@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DataPagination } from "@/components/shared/DataPagination"
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
 
 interface Task {
   _id: string;
@@ -24,7 +26,7 @@ const COLUMNS = ['Todo', 'In Progress', 'Done'] as const;
 
 export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
   
   // Dialog state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,24 +39,15 @@ export default function Tasks() {
     priority: 'Medium',
     dueDate: ''
   });
-
-  const fetchTasks = async () => {
-    try {
-      setLoading(true);
-      const res = await api.get('/tasks');
-      if (res.data?.success) {
-        setTasks(res.data.data);
-      }
-    } catch (error) {
-      console.error("Failed to fetch tasks", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data, isLoading: loading, refetch: fetchTasks } = usePaginatedQuery<Task>({
+    endpoint: "/tasks/paged",
+    page,
+    limit: 25,
+  });
 
   useEffect(() => {
-    fetchTasks();
-  }, []);
+    setTasks(data?.items || []);
+  }, [data?.items]);
 
   const handleAddClick = () => {
     setEditingTaskId(null);
@@ -92,7 +85,7 @@ export default function Tasks() {
       setIsModalOpen(false);
       setEditingTaskId(null);
       setNewTask({ title: '', description: '', status: 'Todo', priority: 'Medium', dueDate: '' });
-      fetchTasks();
+      await fetchTasks();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save task");
     } finally {
@@ -117,6 +110,7 @@ export default function Tasks() {
     try {
       await api.delete(`/tasks/${id}`);
       setTasks(tasks.filter(t => t._id !== id));
+      await fetchTasks();
       toast.success("Task deleted");
     } catch (err: any) {
       toast.error("Failed to delete task");
@@ -147,6 +141,7 @@ export default function Tasks() {
 
     try {
       await api.put(`/tasks/${taskId}`, { status: newStatus });
+      await fetchTasks();
     } catch (error) {
       toast.error("Failed to update task status");
       fetchTasks(); // Revert on failure
@@ -238,6 +233,9 @@ export default function Tasks() {
             </div>
           ))}
         </div>
+      )}
+      {data?.pagination && (
+        <DataPagination pagination={data.pagination} onPageChange={setPage} />
       )}
 
       {/* Task Dialog */}

@@ -1,53 +1,31 @@
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import api from "@/services/api"
-import { toast } from "sonner"
 import { format } from "date-fns"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2 } from "lucide-react"
+import { Download, Loader2 } from "lucide-react"
+import { DataPagination } from "@/components/shared/DataPagination"
+import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
+import { Button } from "@/components/ui/button"
+import { downloadReportCsv } from "@/lib/reportExport"
+import { toast } from "sonner"
 
 export default function SalesReports() {
-  const [loading, setLoading] = useState(true)
-  const [data, setData] = useState<any[]>([])
+  const [page, setPage] = useState(1)
   const [dateFilter, setDateFilter] = useState("All")
   const [statusFilter, setStatusFilter] = useState("All")
 
+  const { data, isLoading: loading, isError } = usePaginatedQuery<any>({
+    endpoint: "/reports/sales",
+    page,
+    limit: 50,
+    params: { period: dateFilter, status: statusFilter },
+  })
+  const filteredData = data?.items || []
   useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    try {
-      setLoading(true)
-      const res = await api.get('/reports/sales')
-      setData(res.data.data)
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to load report")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const filteredData = data.filter((item: any) => {
-    if (statusFilter !== "All" && item.status !== statusFilter) return false;
-    if (dateFilter === "All") return true;
-
-    const d = new Date(item.createdAt);
-    const today = new Date();
-    if (dateFilter === "Today") {
-      return d.toDateString() === today.toDateString();
-    }
-    if (dateFilter === "This Week") {
-      const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
-      return d >= firstDay;
-    }
-    if (dateFilter === "This Month") {
-      return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
-    }
-    return true;
-  });
+    if (isError) toast.error("Failed to load sales report")
+  }, [isError])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -65,7 +43,13 @@ export default function SalesReports() {
     <div className="flex flex-col gap-6 pb-8 h-full">
       <PageHeader title="Sales Reports" description="Analyze sales pipeline and lead conversion data.">
         <div className="flex items-center gap-3">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Button variant="outline" onClick={() => {
+            void downloadReportCsv("sales", { period: dateFilter, status: statusFilter })
+              .catch(() => toast.error("Failed to export sales report"))
+          }}>
+            <Download className="mr-2 h-4 w-4" /> Export CSV
+          </Button>
+          <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1) }}>
             <SelectTrigger className="w-[140px] bg-background">
               <SelectValue placeholder="Status Filter" />
             </SelectTrigger>
@@ -80,7 +64,7 @@ export default function SalesReports() {
             </SelectContent>
           </Select>
 
-          <Select value={dateFilter} onValueChange={setDateFilter}>
+          <Select value={dateFilter} onValueChange={(value) => { setDateFilter(value); setPage(1) }}>
             <SelectTrigger className="w-[140px] bg-background">
               <SelectValue placeholder="Date Filter" />
             </SelectTrigger>
@@ -133,6 +117,7 @@ export default function SalesReports() {
             </TableBody>
           </Table>
         </div>
+        <DataPagination pagination={data?.pagination} onPageChange={setPage} />
       </div>
     </div>
   )
