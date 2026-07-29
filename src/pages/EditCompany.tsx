@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate, useParams } from "@tanstack/react-router"
+import { useQueryClient } from "@tanstack/react-query"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Loader2, ArrowLeft, Building2, MapPin, Contact, Globe, Briefcase } from "lucide-react"
@@ -47,6 +48,7 @@ const BUSINESS_TYPES = [
 
 const LEAD_STATUSES = [
   { value: "New", color: "bg-blue-500" },
+  { value: "Demo Scheduled", color: "bg-cyan-500" },
   { value: "Interested", color: "bg-emerald-500" },
   { value: "Not Interested", color: "bg-red-500" },
   { value: "Prospective", color: "bg-purple-500" },
@@ -56,8 +58,10 @@ const LEAD_STATUSES = [
 ];
 
 export default function EditCompany() {
-  const { companyId } = useParams({ strict: false }) as any
+  const { id, companyId } = useParams({ strict: false }) as any
+  const leadId = id || companyId
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
@@ -85,10 +89,10 @@ export default function EditCompany() {
   })
 
   useEffect(() => {
-    if (companyId) {
-      fetchCompanyDetails(companyId)
+    if (leadId) {
+      fetchCompanyDetails(leadId)
     }
-  }, [companyId])
+  }, [leadId])
 
   const fetchCompanyDetails = async (id: string) => {
     try {
@@ -125,7 +129,7 @@ export default function EditCompany() {
       })
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to load company details")
-      navigate({ to: '/companies' })
+      navigate({ to: '/leads' })
     } finally {
       setLoading(false)
     }
@@ -148,9 +152,13 @@ export default function EditCompany() {
 
     try {
       setSubmitting(true)
-      await api.put(`/companies/${companyId}`, formData)
-      toast.success("Company updated successfully")
-      navigate({ to: '/companies' })
+      await api.put(`/companies/${leadId}`, formData)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
+        queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
+      ])
+      toast.success("Company lead updated successfully")
+      navigate({ to: '/leads/$id', params: { id: leadId } })
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to update company")
     } finally {
@@ -169,12 +177,12 @@ export default function EditCompany() {
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full pb-10">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/companies' })} className="rounded-full hover:bg-muted/80">
+        <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/leads/$id', params: { id: leadId } })} className="rounded-full hover:bg-muted/80">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <PageHeader 
-          title="Edit Company" 
-          description="Update details for this company profile." 
+          title="Edit Company Lead"
+          description="Update the company, primary contact and sales information."
         />
       </div>
 
@@ -196,11 +204,11 @@ export default function EditCompany() {
               <Input id="companyName" name="companyName" value={formData.companyName} onChange={handleInputChange} required className="max-w-2xl bg-background" placeholder="E.g., Antigravity Technologies" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="customerName">Primary Customer Name</Label>
+              <Label htmlFor="customerName">Primary Contact Name</Label>
               <Input id="customerName" name="customerName" value={formData.customerName} onChange={handleInputChange} placeholder="E.g., John Doe" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="customerDesignation">Customer Designation</Label>
+              <Label htmlFor="customerDesignation">Contact Designation</Label>
               <Input id="customerDesignation" name="customerDesignation" value={formData.customerDesignation} onChange={handleInputChange} placeholder="E.g., CEO / Director" />
             </div>
           </CardContent>
@@ -385,7 +393,7 @@ export default function EditCompany() {
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-4 mt-2">
-          <Button type="button" variant="outline" size="lg" className="min-w-[120px]" onClick={() => navigate({ to: '/companies' })}>
+          <Button type="button" variant="outline" size="lg" className="min-w-[120px]" onClick={() => navigate({ to: '/leads/$id', params: { id: leadId } })}>
             Cancel
           </Button>
           <Button type="submit" size="lg" className="min-w-[160px]" disabled={submitting}>

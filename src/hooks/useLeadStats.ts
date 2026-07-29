@@ -18,6 +18,7 @@ interface LeadStatsFilters {
   endDate: string
   month: string
   year: string
+  type?: "Company"
 }
 
 const isValidLeadStatsFilter = (filters: LeadStatsFilters) => {
@@ -42,12 +43,14 @@ export const useLeadStats = (filters: LeadStatsFilters) => useQuery({
     filters.endDate,
     filters.month,
     filters.year,
+    filters.type,
   ],
   enabled: isValidLeadStatsFilter(filters),
   placeholderData: keepPreviousData,
   staleTime: 30_000,
   queryFn: async ({ signal }) => {
     const params: Record<string, string> = { period: filters.period }
+    if (filters.type) params.type = filters.type
     if (filters.period === "date") {
       params.startDate = filters.startDate
       params.endDate = filters.endDate

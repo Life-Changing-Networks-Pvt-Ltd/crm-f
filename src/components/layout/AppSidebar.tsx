@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   Users,
-  Building2,
   FileText,
   Megaphone,
   Mail,
@@ -48,7 +47,6 @@ const navItems = [
     items: [
       { title: "Leads", url: "/leads", icon: Users },
       { title: "Employees", url: "/employees", icon: UserCircle },
-      { title: "Companies", url: "/companies", icon: Building2 },
       { title: "Attendance", url: "/attendance", icon: Clock },
     ],
   },
@@ -120,6 +118,7 @@ export function AppSidebar() {
     if ((url === '/users' || url === '/reports/users' || url === '/reports/attendance') && user.role !== 'admin') return false;
     if (url === '/calling' && user.role !== 'admin') return false;
     if (user.role === 'admin') return true; // Super admin sees everything
+    if (url === '/leads' && user.permissions?.includes('/companies')) return true; // Legacy permission compatibility
     return user.permissions?.includes(url) || false;
   }
 

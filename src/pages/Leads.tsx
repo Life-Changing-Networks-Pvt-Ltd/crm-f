@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { useLeadStats } from "@/hooks/useLeadStats"
+import { CompanyLeadsTable } from "@/components/leads/CompanyLeadsTable"
 
 export default function Leads() {
   const navigate = useNavigate()
   const [statsPeriod, setStatsPeriod] = useState("all")
+  const [listStatus, setListStatus] = useState("all")
   const today = new Date().toISOString().split("T")[0]
   const currentMonth = today.slice(0, 7)
   const currentYear = new Date().getFullYear().toString()
@@ -44,6 +46,7 @@ export default function Leads() {
     endDate: dateRange.endDate,
     month: selectedMonth,
     year: selectedYear,
+    type: "Company",
   })
   const apiStats = { ...defaultStats, ...(data || {}) }
 
@@ -63,7 +66,7 @@ export default function Leads() {
   }
 
   const stats = [
-    { title: "Total Leads", value: apiStats.totalLeads, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { title: "Total Company Leads", value: apiStats.totalLeads, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
     { title: "Demo Scheduled", value: apiStats.demoScheduled, icon: CalendarDays, color: "text-cyan-500", bg: "bg-cyan-500/10", status: "Demo Scheduled" },
     { title: "Interested", value: apiStats.interested, icon: ThumbsUp, color: "text-emerald-500", bg: "bg-emerald-500/10", status: "Interested" },
     { title: "Not Interested", value: apiStats.notInterested, icon: ThumbsDown, color: "text-red-500", bg: "bg-red-500/10", status: "Not Interested" },
@@ -75,7 +78,7 @@ export default function Leads() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="Leads" description="Manage your sales leads.">
+      <PageHeader title="Company Leads" description="Manage company leads, primary contacts and follow-ups.">
         <div className="flex items-center gap-3">
           <Select value={statsPeriod} onValueChange={setStatsPeriod}>
             <SelectTrigger className="w-[150px] bg-background">
@@ -130,8 +133,8 @@ export default function Leads() {
               className="w-[110px]"
             />
           )}
-          <Button onClick={() => navigate({ to: '/companies/new' })}>
-            <Plus className="mr-2 h-4 w-4" /> Add New Lead
+          <Button onClick={() => navigate({ to: '/leads/new' })}>
+            <Plus className="mr-2 h-4 w-4" /> Add Company Lead
           </Button>
         </div>
       </PageHeader>
@@ -142,13 +145,7 @@ export default function Leads() {
           <Card 
             key={i} 
             className="shadow-sm border-muted/60 transition-all hover:shadow-md cursor-pointer hover:border-primary/50"
-            onClick={() => {
-              if (stat.title === "Total Leads") {
-                navigate({ to: '/leads/all' });
-              } else if ("status" in stat && stat.status) {
-                navigate({ to: '/leads/all', search: { status: stat.status } as any });
-              }
-            }}
+            onClick={() => setListStatus("status" in stat && stat.status ? stat.status : "all")}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -168,6 +165,8 @@ export default function Leads() {
           </Card>
         ))}
       </div>
+
+      <CompanyLeadsTable status={listStatus} onStatusChange={setListStatus} />
     </div>
   )
 }

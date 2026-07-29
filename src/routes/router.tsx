@@ -10,7 +10,6 @@ const UnifiedLeadDetails = lazyPage(() => import('../pages/UnifiedLeadDetails'))
 const Employees = lazyPage(() => import('../pages/Employees'));
 const CreateEmployee = lazyPage(() => import('../pages/CreateEmployee'));
 const EditEmployee = lazyPage(() => import('../pages/EditEmployee'));
-const Companies = lazyPage(() => import('../pages/Companies'));
 const CreateCompany = lazyPage(() => import('../pages/CreateCompany'));
 const EditCompany = lazyPage(() => import('../pages/EditCompany'));
 const Campaigns = lazyPage(() => import('../pages/Campaigns'));
@@ -89,14 +88,29 @@ export const indexRoute = createRoute({
 
 // CRM Routes
 const leadsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads', component: Leads });
+const createCompanyLeadRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/new', component: CreateCompany });
+const companyLeadDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/$id', component: UnifiedLeadDetails });
+const editCompanyLeadRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/$id/edit', component: EditCompany });
 const allLeadsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/all', component: AllLeads });
 const unifiedLeadDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/all/$type/$id', component: UnifiedLeadDetails });
 const employeesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees', component: Employees });
 const createEmployeeRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees/new', component: CreateEmployee });
 const editEmployeeRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees/edit/$employeeId', component: EditEmployee });
-const companiesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/companies', component: Companies });
-const createCompanyRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/companies/new', component: CreateCompany });
-const editCompanyRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/companies/edit/$companyId', component: EditCompany });
+const companiesRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/companies',
+  beforeLoad: () => { throw redirect({ to: '/leads' }); },
+});
+const createCompanyRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/companies/new',
+  beforeLoad: () => { throw redirect({ to: '/leads/new' }); },
+});
+const editCompanyRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/companies/edit/$companyId',
+  beforeLoad: ({ params }) => { throw redirect({ to: '/leads/$id/edit', params: { id: params.companyId } }); },
+});
 
 
 
@@ -154,6 +168,9 @@ const routeTree = rootRoute.addChildren([
   protectedRoute.addChildren([
     indexRoute,
     leadsRoute,
+    createCompanyLeadRoute,
+    companyLeadDetailsRoute,
+    editCompanyLeadRoute,
     allLeadsRoute,
     unifiedLeadDetailsRoute,
     employeesRoute,

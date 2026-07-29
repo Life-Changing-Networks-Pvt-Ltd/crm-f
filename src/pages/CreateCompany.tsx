@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
+import { useQueryClient } from "@tanstack/react-query"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Loader2, ArrowLeft, Building2, MapPin, Contact, Globe, Briefcase, FileSpreadsheet } from "lucide-react"
@@ -48,6 +49,7 @@ const BUSINESS_TYPES = [
 
 const LEAD_STATUSES = [
   { value: "New", color: "bg-blue-500" },
+  { value: "Demo Scheduled", color: "bg-cyan-500" },
   { value: "Interested", color: "bg-emerald-500" },
   { value: "Not Interested", color: "bg-red-500" },
   { value: "Prospective", color: "bg-purple-500" },
@@ -58,6 +60,7 @@ const LEAD_STATUSES = [
 
 export default function CreateCompany() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [submitting, setSubmitting] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
 
@@ -102,8 +105,12 @@ export default function CreateCompany() {
     try {
       setSubmitting(true)
       await api.post('/companies', formData)
-      toast.success("Company created successfully")
-      navigate({ to: '/companies' })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
+        queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
+      ])
+      toast.success("Company lead created successfully")
+      navigate({ to: '/leads' })
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to create company")
     } finally {
@@ -114,8 +121,12 @@ export default function CreateCompany() {
   const handleImport = async (data: any[]) => {
     try {
       const res = await api.post('/companies/bulk', { data })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
+        queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
+      ])
       toast.success(res.data.message || "Companies imported successfully")
-      navigate({ to: '/companies' })
+      navigate({ to: '/leads' })
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to import companies")
       throw err;
@@ -150,12 +161,12 @@ export default function CreateCompany() {
     <div className="flex flex-col gap-6 max-w-5xl mx-auto w-full pb-10">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/companies' })} className="rounded-full hover:bg-muted/80">
+          <Button variant="ghost" size="icon" onClick={() => navigate({ to: '/leads' })} className="rounded-full hover:bg-muted/80">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <PageHeader 
-            title="Create New Company" 
-            description="Enter comprehensive details to onboard a new company into the CRM." 
+            title="Add Company Lead"
+            description="Add the company, its primary contact and sales information."
           />
         </div>
         <div className="flex gap-2">
@@ -195,11 +206,11 @@ export default function CreateCompany() {
               <Input id="companyName" name="companyName" value={formData.companyName} onChange={handleInputChange} required className="max-w-2xl bg-background" placeholder="E.g., Antigravity Technologies" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="customerName">Primary Customer Name</Label>
+              <Label htmlFor="customerName">Primary Contact Name</Label>
               <Input id="customerName" name="customerName" value={formData.customerName} onChange={handleInputChange} placeholder="E.g., John Doe" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="customerDesignation">Customer Designation</Label>
+              <Label htmlFor="customerDesignation">Contact Designation</Label>
               <Input id="customerDesignation" name="customerDesignation" value={formData.customerDesignation} onChange={handleInputChange} placeholder="E.g., CEO / Director" />
             </div>
           </CardContent>
@@ -384,12 +395,12 @@ export default function CreateCompany() {
 
         {/* Actions */}
         <div className="flex items-center justify-end gap-4 mt-2">
-          <Button type="button" variant="outline" size="lg" className="min-w-[120px]" onClick={() => navigate({ to: '/companies' })}>
+          <Button type="button" variant="outline" size="lg" className="min-w-[120px]" onClick={() => navigate({ to: '/leads' })}>
             Cancel
           </Button>
           <Button type="submit" size="lg" className="min-w-[160px]" disabled={submitting}>
             {submitting && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-            Save Company
+            Create Company Lead
           </Button>
         </div>
 

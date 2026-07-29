@@ -4,6 +4,7 @@ import { AppSidebar } from "./AppSidebar"
 import { AppNavbar } from "./AppNavbar"
 import { GlobalStickyNotes } from "../shared/GlobalStickyNotes"
 import { BrowserCallDialog } from "../shared/BrowserCallDialog"
+import { FollowUpReminderCenter } from "../shared/FollowUpReminderCenter"
 
 export function AppShell() {
   return (
@@ -19,6 +20,7 @@ export function AppShell() {
       </div>
       <GlobalStickyNotes />
       <BrowserCallDialog />
+      <FollowUpReminderCenter />
     </SidebarProvider>
   )
 }
