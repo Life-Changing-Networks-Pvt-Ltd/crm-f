@@ -17,9 +17,11 @@ import {
   Shield,
   Users2,
   Bell,
+  ClipboardList,
   Clock,
   PhoneCall
 } from "lucide-react"
+import { Share2 } from "lucide-react"
 
 import {
   Sidebar,
@@ -36,6 +38,7 @@ import {
 import { Link as RouterLink, useLocation } from "@tanstack/react-router"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
+import { canOpenPage } from "@/lib/accessControl"
 
 const navItems = [
   {
@@ -93,8 +96,10 @@ const navItems = [
     items: [
       { title: "Users", url: "/users", icon: Users },
       { title: "Roles & Permissions", url: "/roles", icon: Shield },
-      { title: "Page Access", url: "/page-access", icon: Shield },
+      { title: "Access Control", url: "/page-access", icon: Shield },
       { title: "Teams", url: "/teams", icon: Users2 },
+      { title: "Template Access", url: "/template-access", icon: Share2 },
+      { title: "Audit Logs", url: "/audit-logs", icon: ClipboardList },
       { title: "Settings", url: "/settings", icon: Settings },
     ],
   },
@@ -114,12 +119,7 @@ export function AppSidebar() {
 
   const hasAccess = (url: string) => {
     if (!user) return false;
-    if (url === '/attendance' || url === '/calls') return true; // Personal pages are available to every user
-    if ((url === '/users' || url === '/reports/users' || url === '/reports/attendance') && user.role !== 'admin') return false;
-    if (url === '/calling' && user.role !== 'admin') return false;
-    if (user.role === 'admin') return true; // Super admin sees everything
-    if (url === '/leads' && user.permissions?.includes('/companies')) return true; // Legacy permission compatibility
-    return user.permissions?.includes(url) || false;
+    return canOpenPage(user, url);
   }
 
   // Filter items based on permissions
@@ -152,6 +152,7 @@ export function AppSidebar() {
                       asChild
                       isActive={location.pathname === item.url || location.pathname.startsWith(`${item.url}/`)}
                       tooltip={item.title}
+                      className="rounded-xl text-[#374151] transition-colors duration-200 hover:bg-[#FFF3E3] hover:text-[#A85F08] focus-visible:ring-[#C97816] active:bg-[#FFE8CC] active:text-[#A85F08] data-[active=true]:bg-[#C97816] data-[active=true]:font-semibold data-[active=true]:text-white data-[active=true]:shadow-[0_6px_16px_rgba(201,120,22,0.22)] data-[active=true]:hover:bg-[#A95F0B] data-[active=true]:hover:text-white data-[active=true]:active:bg-[#A95F0B] data-[active=true]:active:text-white data-[active=true]:[&>svg]:text-white"
                     >
                       <RouterLink to={item.url as any}>
                         <item.icon />

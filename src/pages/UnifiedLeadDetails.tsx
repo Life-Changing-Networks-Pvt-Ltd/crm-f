@@ -1,10 +1,10 @@
-import { useState, useEffect, type Dispatch, type SetStateAction } from "react"
+import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import { useParams, useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2, MessageSquare, Paperclip, X, Phone, Mail } from "lucide-react"
+import { ArrowLeft, Eye, Loader2, MessageSquare, Paperclip, X, Phone, Mail } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -15,6 +15,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import api, { BACKEND_URL } from "@/services/api"
 import { toast } from "sonner"
 import { browserPhone } from "@/services/browserPhone"
+import { can } from "@/lib/accessControl"
+import { templateToHtml } from "@/features/email-marketing/pages/templateUtils"
+import { PhonePreview } from "@/features/whatsapp-marketing/app/components/ui/phone-preview"
 
 const dateTimeInputValue = (date: Date) => {
   const year = date.getFullYear()
@@ -109,21 +112,35 @@ export default function UnifiedLeadDetails() {
   
   const [lead, setLead] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [statusUpdating, setStatusUpdating] = useState(false)
   const [followUpForm, setFollowUpForm] = useState<FollowUpForm>(() => followUpFormFromLead(null))
   const [savingFollowUp, setSavingFollowUp] = useState(false)
   const [statusDetails, setStatusDetails] = useState<StatusDetailsForm>(() => statusDetailsForm("New"))
   const [savingStatusDetails, setSavingStatusDetails] = useState(false)
+  const [selectedStatus, setSelectedStatus] = useState("New")
   const [commentText, setCommentText] = useState("")
+  const [generalNote, setGeneralNote] = useState("")
+  const [savingGeneralNote, setSavingGeneralNote] = useState(false)
   const [followUpHistory, setFollowUpHistory] = useState<any[]>([])
   const [attachment, setAttachment] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [messageChannel, setMessageChannel] = useState<"email" | "whatsapp" | null>(null)
+  const [availableTemplates, setAvailableTemplates] = useState<any[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState("")
+  const [templatePreviewOpen, setTemplatePreviewOpen] = useState(false)
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+  const [sendingMessage, setSendingMessage] = useState(false)
   
   const [users, setUsers] = useState<any[]>([])
   const [assigning, setAssigning] = useState(false)
   const [callLogs, setCallLogs] = useState<any[]>([])
   const [calling, setCalling] = useState(false)
+  const activityContainerRef = useRef<HTMLDivElement>(null)
+  const canCallLeads = can(currentUser, "calls.manage")
+  const canViewCalls = can(currentUser, "calls.view")
+  const canChangeLeadStatus = can(currentUser, "leads.change_status")
+  const canAssignLeads = can(currentUser, "leads.assign")
+  const canAddLeadNotes = can(currentUser, "leads.add_note")
 
   const getAttachmentUrl = (url: string) => {
     if (!url) return ""
@@ -151,8 +168,8 @@ export default function UnifiedLeadDetails() {
 
   useEffect(() => {
     fetchLead()
-    fetchUsers()
-    fetchCallLogs()
+    if (canAssignLeads) fetchUsers()
+    if (canViewCalls) fetchCallLogs()
   }, [id, leadType])
 
   const fetchUsers = async () => {
@@ -167,13 +184,20 @@ export default function UnifiedLeadDetails() {
   const fetchLead = async () => {
     try {
       setLoading(true)
+      const followUpRequest = leadType === "Company"
+        ? api.get(`/follow-ups/lead/${id}`).catch((error) => {
+            console.error("Failed to fetch follow-up history", error)
+            return null
+          })
+        : Promise.resolve(null)
       const [leadResponse, followUpResponse] = await Promise.all([
         api.get(`/leads/unified/${leadType}/${id}`),
-        leadType === "Company" ? api.get(`/follow-ups/lead/${id}`) : Promise.resolve(null),
+        followUpRequest,
       ])
       const leadData = leadResponse.data.data
       const activeFollowUp = followUpResponse?.data?.data?.active
       setLead(leadData)
+      setSelectedStatus(leadData.leadStatus)
       setStatusDetails(statusDetailsForm(leadData.leadStatus, leadData.statusDetails))
       setFollowUpHistory(followUpResponse?.data?.data?.items || [])
       setFollowUpForm(followUpFormFromLead(activeFollowUp || leadData))
@@ -208,51 +232,114 @@ export default function UnifiedLeadDetails() {
     }
   }
 
-  const handleStatusChange = async (newStatus: string) => {
+  const handleStatusChange = (newStatus: string) => {
+    setSelectedStatus(newStatus)
+    setStatusDetails(statusDetailsForm(newStatus, lead?.statusDetails))
+    setFollowUpForm((current) => ({ ...current, followUpRequired: newStatus === "Follow Up" }))
+  }
+
+  const openMessageComposer = async (channel: "email" | "whatsapp") => {
     try {
-      setStatusUpdating(true)
-      const response = await api.put(`/leads/unified/${leadType}/${id}/status`, { status: newStatus })
-      setLead({
-        ...lead,
-        leadStatus: newStatus,
-        leadStatusChangedAt: response.data.data?.leadStatusChangedAt,
-        followUpRequired: newStatus === "Follow Up" ? lead.followUpRequired : false,
-        followUpDateTime: newStatus === "Follow Up" ? lead.followUpDateTime : null,
+      setMessageChannel(channel)
+      setSelectedTemplateId("")
+      setTemplatePreviewOpen(false)
+      setAvailableTemplates([])
+      setLoadingTemplates(true)
+      const response = await api.get("/template-access/available", {
+        params: {
+          type: channel === "email" ? "email_template" : "whatsapp_template",
+        },
       })
-      setStatusDetails(statusDetailsForm(newStatus, response.data.data?.statusDetails))
-      setFollowUpForm((current) => ({ ...current, followUpRequired: newStatus === "Follow Up" }))
-      window.dispatchEvent(new CustomEvent("follow-up-reminders-refresh"))
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
-        queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
-      ])
-      toast.success("Status updated successfully")
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to update status")
+      setAvailableTemplates(response.data.data || [])
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || `Failed to load ${channel} templates`)
+      setMessageChannel(null)
     } finally {
-      setStatusUpdating(false)
+      setLoadingTemplates(false)
     }
   }
 
+  const handleSendTemplate = async () => {
+    if (!messageChannel || !selectedTemplateId) return
+    try {
+      setSendingMessage(true)
+      await api.post(
+        `/leads/unified/${leadType}/${id}/messages/${messageChannel}`,
+        { templateId: selectedTemplateId },
+      )
+      toast.success(messageChannel === "email" ? "Email sent successfully" : "WhatsApp message sent successfully")
+      setTemplatePreviewOpen(false)
+      setMessageChannel(null)
+      await fetchLead()
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Message could not be sent")
+      await fetchLead()
+    } finally {
+      setSendingMessage(false)
+    }
+  }
+
+  const selectedMessageTemplate = availableTemplates.find(
+    (template) => template.resourceId === selectedTemplateId,
+  )
+  const selectedEmailPreviewHtml = selectedMessageTemplate && messageChannel === "email"
+    ? templateToHtml({
+        htmlContent: selectedMessageTemplate.htmlContent || "",
+        blocks: Array.isArray(selectedMessageTemplate.blocks) ? selectedMessageTemplate.blocks : [],
+        preheader: selectedMessageTemplate.preheader || "",
+      })
+    : ""
+
   const handleSaveStatusDetails = async () => {
-    if (lead.leadStatus === "Demo Scheduled" && !statusDetails.demoDateTime) {
+    const comment = statusDetails.note.trim()
+    if (!comment) {
+      toast.error("Please write comment")
+      return
+    }
+    if (leadType === "Company" && selectedStatus === "Demo Scheduled" && !statusDetails.demoDateTime) {
       toast.error("Select a demo date and time")
       return
     }
-    if (lead.leadStatus === "Not Interested" && !statusDetails.reason) {
+    if (leadType === "Company" && selectedStatus === "Not Interested" && !statusDetails.reason) {
       toast.error("Select a reason")
       return
     }
     try {
       setSavingStatusDetails(true)
       const response = await api.put(`/leads/unified/${leadType}/${id}/status`, {
-        status: lead.leadStatus,
-        details: statusDetails,
+        status: selectedStatus,
+        ...(leadType === "Company" ? { details: statusDetails } : {}),
+        comment,
       })
-      setLead((current: any) => ({ ...current, statusDetails: response.data.data?.statusDetails }))
-      setStatusDetails(statusDetailsForm(lead.leadStatus, response.data.data?.statusDetails))
-      await queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] })
-      toast.success(`${lead.leadStatus} details saved`)
+      const savedAt = response.data.data?.statusDetails?.savedAt || new Date().toISOString()
+      const savedDetails = response.data.data?.statusDetails || {
+        status: selectedStatus,
+        note: comment,
+        savedBy: currentUser,
+        savedAt,
+      }
+      setLead((current: any) => ({
+        ...current,
+        leadStatus: selectedStatus,
+        leadStatusChangedAt: response.data.data?.leadStatusChangedAt,
+        ...(leadType === "Company" ? { statusDetails: response.data.data?.statusDetails } : {}),
+        statusHistory: [{
+          oldStatus: current.leadStatus,
+          newStatus: selectedStatus,
+          entryType: current.leadStatus === selectedStatus ? "details_saved" : "status_change",
+          comment,
+          details: savedDetails,
+          changedBy: currentUser,
+          changedAt: savedAt,
+        }, ...(current.statusHistory || [])],
+      }))
+      setStatusDetails(statusDetailsForm(selectedStatus, response.data.data?.statusDetails))
+      window.dispatchEvent(new CustomEvent("follow-up-reminders-refresh"))
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
+        queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
+      ])
+      toast.success(`${selectedStatus} details saved`)
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save status details")
     } finally {
@@ -272,12 +359,31 @@ export default function UnifiedLeadDetails() {
       return
     }
     if (!commentText.trim()) {
-      toast.error("Enter a follow-up message")
+      toast.error("Please write comment")
       return
     }
 
     try {
       setSavingFollowUp(true)
+      if (lead.leadStatus !== "Follow Up") {
+        const statusResponse = await api.put(`/leads/unified/${leadType}/${id}/status`, {
+          status: "Follow Up",
+          comment: commentText.trim(),
+        })
+        setLead((current: any) => ({
+          ...current,
+          leadStatus: "Follow Up",
+          leadStatusChangedAt: statusResponse.data.data?.leadStatusChangedAt,
+          statusHistory: [{
+            oldStatus: current.leadStatus,
+            newStatus: "Follow Up",
+            entryType: "status_change",
+            comment: commentText.trim(),
+            changedBy: currentUser,
+            changedAt: statusResponse.data.data?.leadStatusChangedAt || new Date().toISOString(),
+          }, ...(current.statusHistory || [])],
+        }))
+      }
       const formData = new FormData()
       formData.append("followUpRequired", "true")
       formData.append("message", commentText.trim())
@@ -303,7 +409,10 @@ export default function UnifiedLeadDetails() {
       removeAttachment()
       const historyResponse = await api.get(`/follow-ups/lead/${id}`)
       setFollowUpHistory(historyResponse.data.data?.items || [])
-      await queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
+        queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
+      ])
       toast.success(response.data.message || "Follow-up saved successfully")
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save follow-up")
@@ -324,6 +433,28 @@ export default function UnifiedLeadDetails() {
       toast.error(err.response?.data?.message || "Failed to assign lead")
     } finally {
       setAssigning(false)
+    }
+  }
+
+  const handleAddGeneralNote = async () => {
+    const text = generalNote.trim()
+    if (!text) {
+      toast.error("Enter a note")
+      return
+    }
+    try {
+      setSavingGeneralNote(true)
+      const response = await api.post(`/leads/unified/${leadType}/${id}/comment`, { text })
+      setLead((current: any) => ({
+        ...current,
+        comments: response.data.data?.comments || current?.comments || [],
+      }))
+      setGeneralNote("")
+      toast.success("Note added successfully")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to add note")
+    } finally {
+      setSavingGeneralNote(false)
     }
   }
 
@@ -357,15 +488,70 @@ export default function UnifiedLeadDetails() {
     ? assignedUsers.map((user: any) => user?.name || "Unknown").join(", ")
     : "-"
 
-  const timelineItems = [
+  const persistedStatusActivities = (lead?.statusHistory || [])
+    .map((item: any) => ({
+      ...item,
+      activityType: item.entryType === "details_saved" ? "status-note" : "status-change",
+      text: item.entryType === "details_saved" ? item.details?.note : item.comment,
+      status: item.newStatus,
+      createdAt: item.changedAt || item.createdAt,
+      createdBy: item.changedBy,
+    }))
+    .filter((item: any) => item.text?.trim())
+  const currentDetailsAlreadyRecorded = persistedStatusActivities.some((item: any) =>
+    item.details
+    && item.status === lead?.statusDetails?.status
+    && Math.abs(
+      new Date(item.createdAt).getTime() - new Date(lead?.statusDetails?.savedAt).getTime(),
+    ) < 1000
+  )
+  const currentDetailsActivity = lead?.statusDetails?.savedAt && !currentDetailsAlreadyRecorded
+    ? [{
+        activityType: "status-note",
+        status: lead.statusDetails.status,
+        text: lead.statusDetails.note,
+        createdAt: lead.statusDetails.savedAt,
+        createdBy: lead.statusDetails.savedBy,
+      }]
+    : []
+  const globalActivityItems = [
+    ...persistedStatusActivities,
+    ...currentDetailsActivity,
     ...followUpHistory.map((item) => ({
       ...item,
+      activityType: "follow-up",
       text: item.message,
       createdAt: item.createdAt,
-      source: "follow-up",
+      createdBy: item.createdBy,
+      status: "Follow Up",
     })),
-    ...(lead?.comments || []).map((item: any) => ({ ...item, source: "legacy-comment" })),
-  ].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    ...(lead?.comments || []).map((item: any) => ({
+      ...item,
+      activityType: "general-note",
+      status: item.status || null,
+    })),
+    ...(lead?.messages || []).map((item: any) => ({
+      ...item,
+      activityType: "lead-message",
+      text: `${item.channel === "email" ? "Email" : "WhatsApp"} ${item.status}: ${item.templateName}`,
+      status: item.channel === "email" ? "Email" : "WhatsApp",
+    })),
+  ]
+    .filter((item: any) => item.text?.trim())
+    .filter((item: any) => !(
+      item.activityType === "status-change"
+      && item.status === "Follow Up"
+      && followUpHistory.some((followUp) =>
+        followUp.message?.trim() === item.text.trim()
+        && Math.abs(new Date(followUp.createdAt).getTime() - new Date(item.createdAt).getTime()) < 60_000
+      )
+    ))
+    .sort((left: any, right: any) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
+
+  useEffect(() => {
+    const container = activityContainerRef.current
+    if (container) container.scrollTop = container.scrollHeight
+  }, [globalActivityItems.length])
 
   if (loading) {
     return (
@@ -394,18 +580,20 @@ export default function UnifiedLeadDetails() {
             {name}
           </button>
         </div>
-        {leadType === "Company" && (
-          <div className="flex items-center gap-2 pl-12 sm:pl-0">
-            <Button size="sm" variant="outline" onClick={() => navigate({ to: "/email-marketing" })}>
+        <div className="flex items-center gap-2 pl-12 sm:pl-0">
+          {can(currentUser, "email.send.lead") && can(currentUser, "email.templates.use") && (
+            <Button size="sm" variant="outline" onClick={() => openMessageComposer("email")}>
               <Mail className="mr-2 h-4 w-4" />
               Email
             </Button>
-            <Button size="sm" variant="outline" onClick={() => navigate({ to: "/whatsapp-marketing" })}>
+          )}
+          {can(currentUser, "whatsapp.send.lead") && can(currentUser, "whatsapp.templates.use") && (
+            <Button size="sm" variant="outline" onClick={() => openMessageComposer("whatsapp")}>
               <MessageSquare className="mr-2 h-4 w-4" />
               WhatsApp
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {leadType === "Company" && (
@@ -458,21 +646,22 @@ export default function UnifiedLeadDetails() {
               <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">Actions</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-5 p-4 text-sm md:p-5">
-              <Button className="w-fit gap-2 px-5" onClick={handleClickToCall} disabled={calling}>
-                {calling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4" />}
-                Click to Call
-              </Button>
+              {canCallLeads && (
+                <Button className="w-fit gap-2 px-5" onClick={handleClickToCall} disabled={calling}>
+                  {calling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4" />}
+                  Click to Call
+                </Button>
+              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
                 <span className="text-muted-foreground block text-xs font-semibold uppercase">Lead Status</span>
                 <Select
-                  value={lead.leadStatus}
+                  value={selectedStatus}
                   onValueChange={handleStatusChange}
-                  disabled={statusUpdating}
+                  disabled={!canChangeLeadStatus || savingStatusDetails || savingFollowUp}
                 >
                   <SelectTrigger className="w-full">
-                    {statusUpdating ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     <SelectValue placeholder="Select Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -490,7 +679,7 @@ export default function UnifiedLeadDetails() {
 
               <div className="flex flex-col gap-1.5">
                 <span className="text-muted-foreground block text-xs font-semibold uppercase">Assigned To</span>
-                <Select value="" onValueChange={handleAssignChange} disabled={assigning}>
+                <Select value="" onValueChange={handleAssignChange} disabled={!canAssignLeads || assigning}>
                   <SelectTrigger className="w-full">
                     {assigning ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                     <SelectValue placeholder={assignedLabel === "-" ? "Assign a user..." : `Assigned: ${assignedLabel}`} />
@@ -507,7 +696,7 @@ export default function UnifiedLeadDetails() {
 
               </div>
 
-              {leadType === "Company" && lead.leadStatus === "Follow Up" && (
+              {canChangeLeadStatus && leadType === "Company" && selectedStatus === "Follow Up" && (
                 <div className="grid gap-4 border-t pt-5 lg:grid-cols-2 lg:gap-x-6">
                   <div className="lg:col-span-2">
                     <p className="text-sm font-semibold">Follow-up & Message</p>
@@ -566,47 +755,6 @@ export default function UnifiedLeadDetails() {
                             )}
                           </div>
                         )}
-                        <div className="mt-2 space-y-2">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Message History</p>
-                          {timelineItems.length === 0 ? (
-                            <div className="flex items-center gap-2 rounded-md border border-dashed px-3 py-4 text-xs text-muted-foreground">
-                              <MessageSquare className="h-4 w-4 shrink-0 opacity-60" />
-                              No follow-up messages yet.
-                            </div>
-                          ) : (
-                            <div className="flex max-h-[210px] flex-col gap-2 overflow-y-auto pr-1">
-                              {timelineItems.map((comment: any, index: number) => (
-                                <div key={comment._id || index} className="rounded-md border bg-muted/20 p-2.5">
-                                  <div className="mb-1 flex items-center justify-between gap-2">
-                                    <span className="text-[11px] font-semibold text-primary">
-                                      {comment.createdBy?._id === currentUser?._id || comment.createdBy === currentUser?._id
-                                        ? "You"
-                                        : comment.createdBy?.name || "User"}
-                                    </span>
-                                    <span className="text-[10px] text-muted-foreground">
-                                      {new Date(comment.createdAt).toLocaleString()}
-                                    </span>
-                                  </div>
-                                  <p className="whitespace-pre-wrap break-words text-xs leading-relaxed">{comment.text}</p>
-                                  {comment.attachment && (
-                                    <div className="mt-2 overflow-hidden rounded border">
-                                      {comment.attachment.fileType === "video" ? (
-                                        <video src={getAttachmentUrl(comment.attachment.url)} controls className="max-h-28 max-w-full bg-black object-contain" />
-                                      ) : (
-                                        <img src={getAttachmentUrl(comment.attachment.url)} alt="Follow-up attachment" className="max-h-28 max-w-full object-contain" />
-                                      )}
-                                    </div>
-                                  )}
-                                  {comment.source === "follow-up" && (
-                                    <span className="mt-1.5 inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-primary">
-                                      {comment.status} · {comment.type}
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
                       </div>
 
                       <div className="flex flex-col gap-1.5 lg:col-start-1">
@@ -680,11 +828,20 @@ export default function UnifiedLeadDetails() {
                   </Button>
                 </div>
               )}
-              {leadType === "Company" && lead.leadStatus !== "Follow Up" && (
+              {canChangeLeadStatus && leadType === "Company" && selectedStatus !== "Follow Up" && (
                 <StatusDetailsPanel
-                  status={lead.leadStatus}
+                  status={selectedStatus}
                   details={statusDetails}
                   setDetails={setStatusDetails}
+                  saving={savingStatusDetails}
+                  onSave={handleSaveStatusDetails}
+                />
+              )}
+              {canChangeLeadStatus && leadType !== "Company" && (
+                <SimpleStatusNotePanel
+                  status={selectedStatus}
+                  note={statusDetails.note}
+                  onNoteChange={(note) => setStatusDetails((current) => ({ ...current, note }))}
                   saving={savingStatusDetails}
                   onSave={handleSaveStatusDetails}
                 />
@@ -695,6 +852,110 @@ export default function UnifiedLeadDetails() {
         </div>
       </div>
 
+      <Card className="border-muted/60 shadow-sm">
+        <CardHeader className="border-b bg-muted/10 py-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <MessageSquare className="h-4 w-4 text-primary" />
+            Lead Activity & Notes
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div ref={activityContainerRef} className="h-[420px] overflow-y-auto bg-muted/20 p-4 md:p-5">
+            {globalActivityItems.length === 0 ? (
+              <div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+                <MessageSquare className="h-5 w-5 opacity-60" />
+                No notes added yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {globalActivityItems.map((item: any, index: number) => {
+                  const authorId = item.createdBy?._id || item.createdBy
+                  const author = authorId === currentUser?._id ? "You" : item.createdBy?.name || "User"
+                  const isOwnNote = authorId === currentUser?._id
+                  return (
+                    <div key={`${item._id || item.createdAt}-${index}`} className={`flex ${isOwnNote ? "justify-end" : "justify-start"}`}>
+                      <div className={`max-w-[88%] rounded-2xl border px-4 py-3 shadow-sm sm:max-w-[75%] ${isOwnNote ? "rounded-br-md border-primary/20 bg-primary/10" : "rounded-bl-md bg-background"}`}>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="bg-background/70">{item.status || "General Note"}</Badge>
+                          {item.activityType === "follow-up" && (
+                            <span className="text-[11px] font-medium text-muted-foreground">Follow-up</span>
+                          )}
+                        </div>
+
+                        <div className="mt-2 text-sm">
+                          <p className="whitespace-pre-wrap break-words leading-relaxed">{item.text}</p>
+                          {item.activityType === "status-change" && (
+                            <p className="mt-1.5 text-[11px] text-muted-foreground">
+                              {item.oldStatus || "Blank"} → {item.newStatus}
+                            </p>
+                          )}
+                          {item.activityType === "follow-up" && (
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                              {item.type && <span>{item.type}</span>}
+                              {item.priority && <span>• {item.priority} priority</span>}
+                              {item.followUpDateTime && <span>• Due {new Date(item.followUpDateTime).toLocaleString()}</span>}
+                            </div>
+                          )}
+                          {item.activityType === "lead-message" && (
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                              <span>To {item.recipient}</span>
+                              {item.subject && <span>• {item.subject}</span>}
+                              {item.providerMessageId && <span>• Provider ID {item.providerMessageId}</span>}
+                              {item.error && <span className="text-destructive">• {item.error}</span>}
+                            </div>
+                          )}
+                          {item.attachment && (
+                            <div className="mt-3 w-fit overflow-hidden rounded-md border">
+                              {item.attachment.fileType === "video" ? (
+                                <video src={getAttachmentUrl(item.attachment.url)} controls className="max-h-48 max-w-full bg-black object-contain" />
+                              ) : (
+                                <img src={getAttachmentUrl(item.attachment.url)} alt="Activity attachment" className="max-h-48 max-w-full object-contain" />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <p className={`mt-2 text-[10px] text-muted-foreground ${isOwnNote ? "text-right" : "text-left"}`}>
+                          {author} • {new Date(item.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          {canAddLeadNotes && (
+          <div className="flex items-end gap-2 border-t bg-background p-3">
+            <Textarea
+              value={generalNote}
+              onChange={(event) => setGeneralNote(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault()
+                  if (generalNote.trim() && !savingGeneralNote) void handleAddGeneralNote()
+                }
+              }}
+              placeholder="Type a note..."
+              maxLength={4000}
+              rows={1}
+              className="max-h-28 min-h-11 resize-none rounded-2xl"
+              disabled={savingGeneralNote}
+            />
+            <Button
+              size="icon"
+              className="h-11 w-11 shrink-0 rounded-full"
+              onClick={handleAddGeneralNote}
+              disabled={savingGeneralNote || !generalNote.trim()}
+              aria-label="Add note"
+            >
+              {savingGeneralNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+            </Button>
+          </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {canViewCalls && (
       <Card className="mt-4 border-muted/60 shadow-sm">
         <CardHeader className="border-b bg-muted/10 py-3">
           <CardTitle className="flex items-center gap-2 text-sm">
@@ -753,6 +1014,134 @@ export default function UnifiedLeadDetails() {
           </div>
         </CardContent>
       </Card>
+      )}
+
+      <Dialog
+        open={Boolean(messageChannel)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTemplatePreviewOpen(false)
+            setMessageChannel(null)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              Send {messageChannel === "email" ? "Email" : "WhatsApp"} Template
+            </DialogTitle>
+            <DialogDescription>
+              Only active, approved templates shared with your role, team, or user account are shown.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-5 py-3">
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recipient</p>
+              <p className="mt-1 font-medium">{lead.customerName || lead.name || lead.companyName}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {messageChannel === "email"
+                  ? lead.email1 || lead.email || "No email address"
+                  : lead.mobileNo || lead.phoneNo || lead.phone || "No phone number"}
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <div className="flex min-h-9 items-center justify-between gap-3">
+                <label className="text-sm font-medium">Approved Template</label>
+                {selectedTemplateId ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setTemplatePreviewOpen(true)}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    Preview
+                  </Button>
+                ) : null}
+              </div>
+              {loadingTemplates ? (
+                <div className="flex h-20 items-center justify-center rounded-xl border">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : availableTemplates.length === 0 ? (
+                <div className="rounded-xl border border-dashed p-5 text-center text-sm text-muted-foreground">
+                  No shared templates are available. Ask an admin to share a template from Administration → Template Access.
+                </div>
+              ) : (
+                <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTemplates.map((template) => (
+                      <SelectItem key={template.resourceId} value={template.resourceId}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {selectedTemplateId && (
+              <div className="rounded-xl border p-4 text-sm">
+                <p className="font-medium">
+                  {selectedMessageTemplate?.name}
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  {selectedMessageTemplate?.subject
+                    || selectedMessageTemplate?.category
+                    || "Template variables will be filled using this lead's contact details."}
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setMessageChannel(null)}>Cancel</Button>
+            <Button onClick={handleSendTemplate} disabled={!selectedTemplateId || sendingMessage || loadingTemplates}>
+              {sendingMessage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Send {messageChannel === "email" ? "Email" : "WhatsApp"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={templatePreviewOpen} onOpenChange={setTemplatePreviewOpen}>
+        <DialogContent className="max-h-[90vh] max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{selectedMessageTemplate?.name || "Template Preview"}</DialogTitle>
+            <DialogDescription>
+              {messageChannel === "email"
+                ? selectedMessageTemplate?.subject || "Read-only preview of the selected email template."
+                : `${selectedMessageTemplate?.category || "WhatsApp"} · ${selectedMessageTemplate?.language || "Default language"}`}
+            </DialogDescription>
+          </DialogHeader>
+          {messageChannel === "email" ? (
+            <div className="h-[65vh] overflow-auto rounded-xl border bg-muted p-4">
+              <iframe
+                title={`${selectedMessageTemplate?.name || "Email template"} preview`}
+                srcDoc={selectedEmailPreviewHtml}
+                sandbox=""
+                className="mx-auto min-h-full w-full max-w-2xl rounded-lg border-0 bg-white shadow-sm"
+              />
+            </div>
+          ) : (
+            <div className="max-h-[70vh] overflow-auto rounded-xl border bg-muted/40 p-4">
+              <PhonePreview
+                headerType={selectedMessageTemplate?.headerType || undefined}
+                headerText={selectedMessageTemplate?.headerText || ""}
+                headerImage={selectedMessageTemplate?.previewUrl || selectedMessageTemplate?.headerImageUrl || ""}
+                body={selectedMessageTemplate?.content || ""}
+                footer={selectedMessageTemplate?.footer || ""}
+                buttons={Array.isArray(selectedMessageTemplate?.buttons) ? selectedMessageTemplate.buttons : []}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
@@ -805,6 +1194,44 @@ export default function UnifiedLeadDetails() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function SimpleStatusNotePanel({
+  status,
+  note,
+  onNoteChange,
+  saving,
+  onSave,
+}: {
+  status: string
+  note: string
+  onNoteChange: (note: string) => void
+  saving: boolean
+  onSave: () => void
+}) {
+  return (
+    <div className="space-y-4 border-t pt-5">
+      <div>
+        <p className="text-sm font-semibold">{status} Details</p>
+        <p className="text-xs text-muted-foreground">Add a comment before saving this lead status.</p>
+      </div>
+      <Field label={`${status} Note`}>
+        <Textarea
+          value={note}
+          onChange={(event) => onNoteChange(event.target.value)}
+          placeholder="Add relevant details..."
+          className="min-h-[76px]"
+          disabled={saving}
+        />
+      </Field>
+      <div className="flex justify-end">
+        <Button className="w-fit px-5" onClick={onSave} disabled={saving}>
+          {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Save {status}
+        </Button>
+      </div>
     </div>
   )
 }

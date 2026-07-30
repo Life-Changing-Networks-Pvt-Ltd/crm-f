@@ -3,6 +3,8 @@ import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import { AppShell } from '../components/layout/AppShell';
 import { lazyPage } from '../components/layout/lazyPage';
+import type { User } from '../store/slices/authSlice';
+import { can } from '../lib/accessControl';
 
 const Leads = lazyPage(() => import('../pages/Leads'));
 const AllLeads = lazyPage(() => import('../pages/AllLeads'));
@@ -33,6 +35,8 @@ const Users = lazyPage(() => import('../pages/Users'));
 const Roles = lazyPage(() => import('../pages/Roles'));
 const PageAccess = lazyPage(() => import('../pages/PageAccess'));
 const Teams = lazyPage(() => import('../pages/Teams'));
+const TemplateAccess = lazyPage(() => import('../pages/TemplateAccess'));
+const AuditLogs = lazyPage(() => import('../pages/AuditLogs'));
 const Profile = lazyPage(() => import('../pages/Profile'));
 const Notifications = lazyPage(() => import('../pages/Notifications'));
 const Calling = lazyPage(() => import('../pages/Calling'));
@@ -43,6 +47,7 @@ const CallDetails = lazyPage(() => import('../pages/CallDetails'));
 export interface MyRouterContext {
   auth: {
     isAuthenticated: boolean;
+    user: User | null;
   };
 }
 
@@ -84,18 +89,36 @@ export const indexRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/',
   component: Dashboard,
+  beforeLoad: ({ context }) => {
+    if (!context.auth.isAuthenticated) throw redirect({ to: '/login' });
+    if (!can(context.auth.user, 'dashboard.view')) throw redirect({ to: '/profile' });
+  },
 });
 
+const requireAuthentication = ({ context }: { context: MyRouterContext }) => {
+  if (!context.auth.isAuthenticated) throw redirect({ to: '/login' });
+};
+const requireGrant = (permission: string) => ({ context }: { context: MyRouterContext }) => {
+  requireAuthentication({ context });
+  if (!can(context.auth.user, permission)) throw redirect({ to: '/profile' });
+};
+const requireAnyGrant = (...permissions: string[]) => ({ context }: { context: MyRouterContext }) => {
+  requireAuthentication({ context });
+  if (!permissions.some((permission) => can(context.auth.user, permission))) {
+    throw redirect({ to: '/profile' });
+  }
+};
+
 // CRM Routes
-const leadsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads', component: Leads });
-const createCompanyLeadRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/new', component: CreateCompany });
-const companyLeadDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/$id', component: UnifiedLeadDetails });
-const editCompanyLeadRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/$id/edit', component: EditCompany });
-const allLeadsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/all', component: AllLeads });
-const unifiedLeadDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/all/$type/$id', component: UnifiedLeadDetails });
-const employeesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees', component: Employees });
-const createEmployeeRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees/new', component: CreateEmployee });
-const editEmployeeRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees/edit/$employeeId', component: EditEmployee });
+const leadsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads', component: Leads, beforeLoad: requireGrant('leads.view') });
+const createCompanyLeadRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/new', component: CreateCompany, beforeLoad: requireGrant('leads.create') });
+const companyLeadDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/$id', component: UnifiedLeadDetails, beforeLoad: requireGrant('leads.view') });
+const editCompanyLeadRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/$id/edit', component: EditCompany, beforeLoad: requireGrant('leads.edit') });
+const allLeadsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/all', component: AllLeads, beforeLoad: requireGrant('leads.view') });
+const unifiedLeadDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/leads/all/$type/$id', component: UnifiedLeadDetails, beforeLoad: requireGrant('leads.view') });
+const employeesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees', component: Employees, beforeLoad: requireGrant('employees.view') });
+const createEmployeeRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees/new', component: CreateEmployee, beforeLoad: requireGrant('employees.manage') });
+const editEmployeeRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/employees/edit/$employeeId', component: EditEmployee, beforeLoad: requireGrant('employees.manage') });
 const companiesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/companies',
@@ -116,24 +139,21 @@ const editCompanyRoute = createRoute({
 
 // Marketing Routes
 const campaignsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/campaigns', component: Campaigns });
-const requireAuthentication = ({ context }: { context: MyRouterContext }) => {
-  if (!context.auth.isAuthenticated) throw redirect({ to: '/login' });
-};
-const emailMarketingRoute = createRoute({ getParentRoute: () => rootRoute, path: '/email-marketing', component: EmailMarketing, beforeLoad: requireAuthentication });
-const emailMarketingWildcardRoute = createRoute({ getParentRoute: () => rootRoute, path: '/email-marketing/$', component: EmailMarketing, beforeLoad: requireAuthentication });
-const whatsappRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-marketing', component: WhatsAppMarketingModule, beforeLoad: requireAuthentication });
-const whatsappWildcardRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-marketing/$', component: WhatsAppMarketingModule, beforeLoad: requireAuthentication });
+const emailMarketingRoute = createRoute({ getParentRoute: () => rootRoute, path: '/email-marketing', component: EmailMarketing, beforeLoad: requireGrant('email.module.view') });
+const emailMarketingWildcardRoute = createRoute({ getParentRoute: () => rootRoute, path: '/email-marketing/$', component: EmailMarketing, beforeLoad: requireGrant('email.module.view') });
+const whatsappRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-marketing', component: WhatsAppMarketingModule, beforeLoad: requireGrant('whatsapp.module.view') });
+const whatsappWildcardRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-marketing/$', component: WhatsAppMarketingModule, beforeLoad: requireGrant('whatsapp.module.view') });
 const legacyWhatsappRoute = createRoute({ getParentRoute: () => rootRoute, path: '/whatsapp-campaigns', beforeLoad: () => { throw redirect({ to: '/whatsapp-marketing' }); } });
 
 // Communication Routes
 const messagesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/messages', component: Messages });
 const emailInboxRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/email-inbox', component: EmailInbox });
 const meetingsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/meetings', component: Meetings });
-const callingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calling', component: Calling });
-const callHistoryRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calls', component: CallHistory });
-const callDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calls/$id', component: CallDetails });
-const settingsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/settings', component: Settings });
-const attendanceRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/attendance', component: Attendance });
+const callingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calling', component: Calling, beforeLoad: requireGrant('calls.manage') });
+const callHistoryRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calls', component: CallHistory, beforeLoad: requireGrant('calls.view') });
+const callDetailsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calls/$id', component: CallDetails, beforeLoad: requireGrant('calls.view') });
+const settingsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/settings', component: Settings, beforeLoad: requireGrant('admin.settings.manage') });
+const attendanceRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/attendance', component: Attendance, beforeLoad: requireGrant('attendance.view') });
 
 // Tasks Routes
 const tasksRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/tasks', component: Tasks });
@@ -141,18 +161,29 @@ const calendarRoute = createRoute({ getParentRoute: () => protectedRoute, path: 
 const notesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/notes', component: Notes });
 
 // Reports Routes
-const reportsDashboardRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/dashboard', component: DashboardReports });
-const reportsSalesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/sales', component: SalesReports });
-const reportsMarketingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/marketing', component: MarketingReports });
-const reportsUsersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/users', component: UserReports });
-const meetingReportsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/meeting-reports', component: MeetingReports });
-const attendanceReportsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/attendance', component: AttendanceReports });
+const reportsDashboardRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/dashboard', component: DashboardReports, beforeLoad: requireGrant('reports.view') });
+const reportsSalesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/sales', component: SalesReports, beforeLoad: requireGrant('reports.view') });
+const reportsMarketingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/marketing', component: MarketingReports, beforeLoad: requireGrant('reports.view') });
+const reportsUsersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/users', component: UserReports, beforeLoad: requireGrant('reports.view') });
+const meetingReportsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/meeting-reports', component: MeetingReports, beforeLoad: requireGrant('reports.view') });
+const attendanceReportsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/attendance', component: AttendanceReports, beforeLoad: requireGrant('reports.view') });
 
 // Administration Routes
-const usersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/users', component: Users });
-const rolesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/roles', component: Roles });
-const pageAccessRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/page-access', component: PageAccess });
-const teamsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/teams', component: Teams });
+const usersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/users', component: Users, beforeLoad: requireGrant('admin.users.view') });
+const rolesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/roles', component: Roles, beforeLoad: requireGrant('admin.roles.view') });
+const pageAccessRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/page-access', component: PageAccess, beforeLoad: requireGrant('admin.roles.view') });
+const teamsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/teams', component: Teams, beforeLoad: requireGrant('admin.teams.view') });
+const templateAccessRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/template-access',
+  component: TemplateAccess,
+  beforeLoad: requireAnyGrant(
+    'admin.template_access.view',
+    'email.templates.share',
+    'whatsapp.templates.share',
+  ),
+});
+const auditLogsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/audit-logs', component: AuditLogs, beforeLoad: requireGrant('admin.audit.view') });
 
 // System Routes
 const profileRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/profile', component: Profile });
@@ -201,6 +232,8 @@ const routeTree = rootRoute.addChildren([
     rolesRoute,
     pageAccessRoute,
     teamsRoute,
+    templateAccessRoute,
+    auditLogsRoute,
     settingsRoute,
     profileRoute,
     notificationsRoute,

@@ -1,5 +1,7 @@
 import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
+import { useSelector } from "react-redux"
+import type { RootState } from "@/store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -16,9 +18,12 @@ import api from "@/services/api"
 import { BriefcaseBusiness, Eye, Loader2, Pencil, Plus, Trash2, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import Swal from "sweetalert2"
+import { can } from "@/lib/accessControl"
 
 export default function Employees() {
   const navigate = useNavigate()
+  const { user: currentUser } = useSelector((state: RootState) => state.auth)
+  const canManageEmployees = can(currentUser, "employees.manage")
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
   const [isViewOpen, setIsViewOpen] = useState(false)
   const [page, setPage] = useState(1)
@@ -117,9 +122,11 @@ export default function Employees() {
               <SelectItem value="Terminated">Terminated</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={() => navigate({ to: "/employees/new" })}>
-            <Plus className="mr-2 h-4 w-4" /> Add Employee
-          </Button>
+          {canManageEmployees && (
+            <Button onClick={() => navigate({ to: "/employees/new" })}>
+              <Plus className="mr-2 h-4 w-4" /> Add Employee
+            </Button>
+          )}
         </div>
       </PageHeader>
 
@@ -131,8 +138,8 @@ export default function Employees() {
         <EmptyState
           title="No employees found"
           description="Get started by creating a new employee."
-          actionLabel="Create Employee"
-          onAction={() => navigate({ to: "/employees/new" })}
+          actionLabel={canManageEmployees ? "Create Employee" : undefined}
+          onAction={canManageEmployees ? () => navigate({ to: "/employees/new" }) : undefined}
           icon={<UserRound className="h-10 w-10 text-muted-foreground" />}
         />
       ) : (
@@ -177,12 +184,16 @@ export default function Employees() {
                           <Button variant="ghost" size="icon" onClick={() => openDetails(employee)} title="View Details">
                             <Eye className="h-4 w-4 text-blue-500" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => navigate({ to: `/employees/edit/${employee._id}` })} title="Edit Employee">
-                            <Pencil className="h-4 w-4 text-orange-500" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(employee._id)} title="Delete Employee">
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
+                          {canManageEmployees && (
+                            <>
+                              <Button variant="ghost" size="icon" onClick={() => navigate({ to: `/employees/edit/${employee._id}` })} title="Edit Employee">
+                                <Pencil className="h-4 w-4 text-orange-500" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => handleDelete(employee._id)} title="Delete Employee">
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

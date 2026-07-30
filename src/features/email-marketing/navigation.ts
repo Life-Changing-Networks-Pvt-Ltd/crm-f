@@ -179,10 +179,7 @@ const allItems = emailMarketingNavigation.flatMap((group) => group.items)
 const permissionByPath: Array<[prefix: string, permission: TeamPermission]> = [
   ["/connect-domain", "manage_sending_domains"],
   ["/campaigns", "manage_campaigns"],
-  ["/templates", "edit_content"],
-  ["/email-builder", "edit_content"],
-  ["/simple-editor", "edit_content"],
-  ["/html-editor", "edit_content"],
+  ["/templates", "view_shared_templates"],
   ["/audience", "manage_audience"],
   ["/segments", "manage_audience"],
   ["/suppressions", "manage_audience"],
@@ -197,6 +194,12 @@ const permissionByPath: Array<[prefix: string, permission: TeamPermission]> = [
 ]
 
 export function getEmailMarketingRequiredPermission(modulePath: string) {
+  if (/^\/(email-builder|simple-editor|html-editor)\/new$/.test(modulePath)) {
+    return "create_content"
+  }
+  if (/^\/(email-builder|simple-editor|html-editor)(?:\/|$)/.test(modulePath)) {
+    return "edit_content"
+  }
   return permissionByPath.find(([prefix]) =>
     modulePath === prefix || modulePath.startsWith(`${prefix}/`),
   )?.[1] || "view_dashboard"

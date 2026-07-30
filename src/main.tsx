@@ -18,6 +18,7 @@ import { setCredentials, logoutUser } from './store/slices/authSlice';
 import { setSettings } from './store/slices/settingsSlice';
 function App() {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+  const user = useSelector((state: RootState) => state.auth.user);
   const dispatch = useDispatch();
 
   const currentUserQuery = useQuery({
@@ -55,7 +56,7 @@ function App() {
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="crm-theme">
-      <RouterProvider router={router} context={{ auth: { isAuthenticated } }} />
+      <RouterProvider router={router} context={{ auth: { isAuthenticated, user } }} />
       <Toaster />
     </ThemeProvider>
   );

@@ -9,9 +9,13 @@ import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { useLeadStats } from "@/hooks/useLeadStats"
 import { CompanyLeadsTable } from "@/components/leads/CompanyLeadsTable"
+import { useSelector } from "react-redux"
+import type { RootState } from "@/store"
+import { can } from "@/lib/accessControl"
 
 export default function Leads() {
   const navigate = useNavigate()
+  const currentUser = useSelector((state: RootState) => state.auth.user)
   const [statsPeriod, setStatsPeriod] = useState("all")
   const [listStatus, setListStatus] = useState("all")
   const today = new Date().toISOString().split("T")[0]
@@ -24,6 +28,7 @@ export default function Leads() {
   const startDateRef = useRef<HTMLInputElement>(null)
   const endDateRef = useRef<HTMLInputElement>(null)
   const monthRef = useRef<HTMLInputElement>(null)
+  const leadsTableRef = useRef<HTMLDivElement>(null)
 
   const defaultStats = {
     totalLeads: 0,
@@ -75,6 +80,13 @@ export default function Leads() {
     { title: "Converted", value: apiStats.converted, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10", status: "Converted" },
     { title: "Follow Up", value: apiStats.followUp, icon: CalendarDays, color: "text-indigo-500", bg: "bg-indigo-500/10", status: "Follow Up" },
   ];
+
+  const showLeadsForStatus = (status: string) => {
+    setListStatus(status)
+    requestAnimationFrame(() => {
+      leadsTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -133,9 +145,11 @@ export default function Leads() {
               className="w-[110px]"
             />
           )}
-          <Button onClick={() => navigate({ to: '/leads/new' })}>
-            <Plus className="mr-2 h-4 w-4" /> Add Company Lead
-          </Button>
+          {can(currentUser, "leads.create") && (
+            <Button onClick={() => navigate({ to: '/leads/new' })}>
+              <Plus className="mr-2 h-4 w-4" /> Add Company Lead
+            </Button>
+          )}
         </div>
       </PageHeader>
 
@@ -145,7 +159,16 @@ export default function Leads() {
           <Card 
             key={i} 
             className="shadow-sm border-muted/60 transition-all hover:shadow-md cursor-pointer hover:border-primary/50"
-            onClick={() => setListStatus("status" in stat && stat.status ? stat.status : "all")}
+            role="button"
+            tabIndex={0}
+            aria-label={`Show ${stat.title}`}
+            onClick={() => showLeadsForStatus("status" in stat && stat.status ? stat.status : "all")}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault()
+                showLeadsForStatus("status" in stat && stat.status ? stat.status : "all")
+              }
+            }}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -166,7 +189,9 @@ export default function Leads() {
         ))}
       </div>
 
-      <CompanyLeadsTable status={listStatus} onStatusChange={setListStatus} />
+      <div ref={leadsTableRef}>
+        <CompanyLeadsTable status={listStatus} onStatusChange={setListStatus} />
+      </div>
     </div>
   )
 }

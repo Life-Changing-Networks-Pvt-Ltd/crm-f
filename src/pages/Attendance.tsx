@@ -22,6 +22,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { can } from "@/lib/accessControl"
 
 function getDistanceFromLatLonInM(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371e3; // Radius of the earth in m
@@ -44,7 +45,7 @@ const DISTANCE_THRESHOLD = 500; // meters
 
 export default function Attendance() {
   const { user } = useSelector((state: RootState) => state.auth)
-  const isAdmin = user?.role === 'admin'
+  const isAdmin = can(user, "attendance.manage")
 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [loading, setLoading] = useState(false)

@@ -10,7 +10,7 @@ export type DomainStatus = "pending" | "verified" | "failed"
 export type AutomationStatus = "draft" | "active" | "inactive" | "archived"
 export type AutomationTrigger = "welcome_signup" | "welcome_series" | "order_confirmation" | "payment_success" | "shipping_update" | "delivery_confirmation" | "abandoned_cart" | "browse_abandonment" | "order_followup" | "review_request" | "win_back" | "price_drop" | "back_in_stock" | "inactive_subscriber" | "reminder_email" | "discount_offer"
 export type AutomationStepType = "delay" | "condition" | "send_email" | "add_tag" | "remove_tag" | "webhook" | "exit"
-export type TeamPermission = "view_dashboard" | "manage_campaigns" | "edit_content" | "manage_audience" | "manage_automations" | "view_analytics" | "view_reports" | "manage_sending_domains" | "view_billing" | "manage_team_access" | "manage_settings"
+export type TeamPermission = "view_dashboard" | "view_shared_templates" | "create_content" | "manage_campaigns" | "edit_content" | "share_content" | "manage_audience" | "manage_automations" | "view_analytics" | "view_reports" | "manage_sending_domains" | "view_billing" | "manage_team_access" | "manage_settings"
 
 export interface EmailMarketingSender {
   fromName: string

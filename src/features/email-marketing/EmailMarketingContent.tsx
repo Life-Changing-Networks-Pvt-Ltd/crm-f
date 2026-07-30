@@ -1,4 +1,4 @@
-import { Construction, LoaderCircle, ShieldAlert } from "lucide-react"
+import { Construction, LoaderCircle, RefreshCw, ShieldAlert, TriangleAlert } from "lucide-react"
 
 import { useEmailMarketingStore } from "./EmailMarketingStore"
 import { getEmailMarketingModulePath, getEmailMarketingPageMeta, getEmailMarketingRequiredPermission } from "./navigation"
@@ -25,9 +25,29 @@ interface EmailMarketingContentProps {
 }
 
 export function EmailMarketingContent({ pathname }: EmailMarketingContentProps) {
-  const { loading, permissions } = useEmailMarketingStore()
+  const { loading, syncError, permissions, refresh } = useEmailMarketingStore()
   if (loading) {
     return <main className="flex min-h-0 flex-1 items-center justify-center overflow-auto"><div className="flex items-center gap-3 text-sm text-muted-foreground"><LoaderCircle className="h-5 w-5 animate-spin text-primary" />Syncing Email Marketing workspace...</div></main>
+  }
+  if (syncError) {
+    return (
+      <main className="flex min-h-0 flex-1 items-center justify-center overflow-auto bg-background p-6">
+        <section className="max-w-md rounded-3xl border bg-card p-8 text-center shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600">
+            <TriangleAlert className="h-7 w-7" />
+          </div>
+          <h2 className="mt-5 text-xl font-semibold text-card-foreground">Email Marketing could not be loaded</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">{syncError}</p>
+          <button
+            type="button"
+            onClick={() => void refresh().catch(() => undefined)}
+            className="mt-5 inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />Retry
+          </button>
+        </section>
+      </main>
+    )
   }
   const modulePath = getEmailMarketingModulePath(pathname)
   const requiredPermission = getEmailMarketingRequiredPermission(modulePath)

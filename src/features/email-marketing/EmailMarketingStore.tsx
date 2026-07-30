@@ -1,7 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 
-import { emailMarketingRequest } from "./emailMarketingApi"
+import {
+  emailMarketingRequest,
+  getEmailMarketingErrorMessage,
+} from "./emailMarketingApi"
 import type {
   AutomationInput,
   AutomationStatus,
@@ -227,7 +230,7 @@ export function EmailMarketingStoreProvider({ children }: { children: ReactNode 
       setPlatformSender(snapshot.config.platformSender)
       setSyncError("")
     } catch (error) {
-      setSyncError(error instanceof Error ? error.message : "Email Marketing sync failed")
+      setSyncError(getEmailMarketingErrorMessage(error, "Email Marketing sync failed"))
       throw error
     } finally {
       setLoading(false)

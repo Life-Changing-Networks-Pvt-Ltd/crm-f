@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react"
 import { Link, useNavigate } from "@tanstack/react-router"
-import { ChevronLeft, ChevronRight, Code2, Copy, Eye, FileText, LayoutGrid, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react"
+import { ChevronLeft, ChevronRight, Code2, Copy, Eye, FileText, LayoutGrid, MoreVertical, Pencil, Plus, Send, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -34,7 +34,9 @@ function editorPath(template: EmailTemplate) {
 
 export function TemplatesPage() {
   const navigate = useNavigate()
-  const { templates, createTemplate, duplicateTemplate, deleteTemplate, updateTemplate } = useEmailMarketingStore()
+  const { templates, permissions, createTemplate, duplicateTemplate, deleteTemplate, updateTemplate } = useEmailMarketingStore()
+  const canCreate = permissions.includes("create_content") || permissions.includes("edit_content")
+  const canEdit = permissions.includes("edit_content")
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState("all")
   const [page, setPage] = useState(1)
@@ -82,7 +84,7 @@ export function TemplatesPage() {
   return (
     <ModulePage>
       <PageContainer>
-        <PageHeading title="Templates" description="" actions={<Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />Create Template</Button>} />
+        <PageHeading title="Templates" description="" actions={canCreate ? <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />Create Template</Button> : undefined} />
 
         <section className="rounded-xl border bg-card px-5 py-4 shadow-sm">
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(220px,340px)] md:items-center">
@@ -97,9 +99,9 @@ export function TemplatesPage() {
         <section className="overflow-visible rounded-xl border bg-card shadow-sm">
           <div className="flex flex-col gap-3 border-b p-4 xl:flex-row xl:items-center">
             <div className="flex items-center gap-3 xl:flex-1">
-              <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border bg-background shadow-sm" title="Select visible templates">
+              {canEdit ? <label className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border bg-background shadow-sm" title="Select visible templates">
                 <Checkbox checked={allVisibleSelected} onCheckedChange={(checked) => toggleVisible(Boolean(checked))} />
-              </label>
+              </label> : null}
               <SearchField value={query} onChange={(value) => { setQuery(value); setPage(1) }} placeholder="Search for templates" className="min-w-0 flex-1 xl:max-w-md" />
               <Select value={status} onValueChange={(value) => { setStatus(value); setPage(1) }}>
                 <SelectTrigger className="w-44 shrink-0"><SelectValue /></SelectTrigger>
@@ -120,7 +122,7 @@ export function TemplatesPage() {
               {visibleTemplates.map((template, index) => (
                 <article key={template.id} className="relative flex flex-col gap-4 p-4 transition hover:bg-muted/20 sm:flex-row sm:items-center">
                   <div className="flex min-w-0 flex-1 items-start gap-3">
-                    <Checkbox className="mt-1" checked={selectedIds.includes(template.id)} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...current, template.id] : current.filter((id) => id !== template.id))} />
+                    {canEdit ? <Checkbox className="mt-1" checked={selectedIds.includes(template.id)} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...current, template.id] : current.filter((id) => id !== template.id))} /> : null}
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <h3 className="truncate text-sm font-semibold">{template.name}</h3>
@@ -131,8 +133,9 @@ export function TemplatesPage() {
                   </div>
 
                   <div className="flex items-center justify-end gap-2">
-                    <Button size="icon" variant="outline" asChild title="Edit template"><Link to={getEmailMarketingPath(editorPath(template)) as never}><Pencil className="h-4 w-4" /></Link></Button>
-                    <Button size="icon" variant="outline" onClick={() => setActionId(actionId === template.id ? null : template.id)} title="More actions"><MoreVertical className="h-4 w-4" /></Button>
+                    {!canEdit ? <Button variant="outline" asChild><Link to="/leads"><Send className="mr-2 h-4 w-4" />Use on a lead</Link></Button> : null}
+                    {canEdit ? <Button size="icon" variant="outline" asChild title="Edit template"><Link to={getEmailMarketingPath(editorPath(template)) as never}><Pencil className="h-4 w-4" /></Link></Button> : null}
+                    {canEdit ? <Button size="icon" variant="outline" onClick={() => setActionId(actionId === template.id ? null : template.id)} title="More actions"><MoreVertical className="h-4 w-4" /></Button> : null}
                   </div>
                   {actionId === template.id ? <div className="absolute right-4 top-[calc(100%-10px)] z-20 w-44 rounded-lg border bg-popover p-1 shadow-lg">
                     <button className="flex w-full items-center rounded-md px-3 py-2 text-sm hover:bg-accent" onClick={() => { duplicateTemplate(template.id); setActionId(null); toast.success("Template duplicated") }}><Copy className="mr-2 h-4 w-4" />Duplicate</button>
@@ -142,7 +145,7 @@ export function TemplatesPage() {
                 </article>
               ))}
             </div>
-          ) : <div className="p-4"><EmptyPanel title={templates.length ? "No matching templates" : "Create your first email template"} description={templates.length ? "Try changing the search or status filter." : "Choose an editor or start from a ready-made layout."} action={!templates.length ? <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />Create template</Button> : undefined} /></div>}
+          ) : <div className="p-4"><EmptyPanel title={templates.length ? "No matching templates" : canCreate ? "Create your first email template" : "No shared templates"} description={templates.length ? "Try changing the search or status filter." : canCreate ? "Choose an editor or start from a ready-made layout." : "Ask an administrator to share an active template with you."} action={!templates.length && canCreate ? <Button onClick={() => setCreateOpen(true)}><Plus className="mr-2 h-4 w-4" />Create template</Button> : undefined} /></div>}
         </section>
       </PageContainer>
 

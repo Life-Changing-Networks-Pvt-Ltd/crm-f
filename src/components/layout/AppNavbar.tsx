@@ -53,16 +53,20 @@ export function AppNavbar() {
   };
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] shrink-0">
-      <SidebarTrigger className="-ml-1" />
-      <Separator orientation="vertical" className="mr-2 h-4" />
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-4 border-b border-[#F3D4AD] bg-[#FFFCF8] px-4 shadow-[0_4px_14px_rgba(169,95,11,0.07)] dark:border-border dark:bg-background lg:h-[60px]">
+      <SidebarTrigger className="-ml-1 text-[#374151] hover:bg-[#FFF3E3] hover:text-[#C97816] focus-visible:ring-[#C97816] dark:text-foreground dark:hover:bg-accent" />
+      <Separator orientation="vertical" className="mr-2 h-4 bg-[#E8C493] dark:bg-border" />
       <Breadcrumbs />
       <div className="flex flex-1 items-center justify-end gap-4">
         <SearchBar />
         
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative text-[#374151] hover:bg-[#FFF3E3] hover:text-[#C97816] focus-visible:ring-[#C97816] dark:text-foreground dark:hover:bg-accent"
+            >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
                 <span className="absolute top-1.5 right-1.5 flex h-2 w-2 rounded-full bg-red-600">

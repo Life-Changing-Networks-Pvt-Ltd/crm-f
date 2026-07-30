@@ -10,8 +10,12 @@ import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
 import { Button } from "@/components/ui/button"
 import { downloadReportCsv } from "@/lib/reportExport"
 import { toast } from "sonner"
+import { useSelector } from "react-redux"
+import type { RootState } from "@/store"
+import { can } from "@/lib/accessControl"
 
 export default function MeetingReports() {
+  const currentUser = useSelector((state: RootState) => state.auth.user)
   const [page, setPage] = useState(1)
   const [dateFilter, setDateFilter] = useState("All")
   const [statusFilter, setStatusFilter] = useState("All")
@@ -40,12 +44,12 @@ export default function MeetingReports() {
     <div className="flex flex-col gap-6 pb-8 h-full">
       <PageHeader title="Meeting Reports" description="Analyze meetings, durations, and summaries.">
         <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => {
+          {can(currentUser, "reports.export") && <Button variant="outline" onClick={() => {
             void downloadReportCsv("meetings", { period: dateFilter, status: statusFilter })
               .catch(() => toast.error("Failed to export meeting report"))
           }}>
             <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
+          </Button>}
           <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); setPage(1) }}>
             <SelectTrigger className="w-[140px] bg-background">
               <SelectValue placeholder="Status Filter" />

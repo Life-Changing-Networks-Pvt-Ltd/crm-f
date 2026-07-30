@@ -19,7 +19,10 @@ export function Breadcrumbs() {
       <BreadcrumbList>
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link to="/" className="flex items-center">
+            <Link
+              to="/"
+              className="flex items-center text-[#C97816] transition-colors hover:text-[#A95F0B]"
+            >
               <Home className="h-4 w-4" />
             </Link>
           </BreadcrumbLink>
@@ -36,10 +39,10 @@ export function Breadcrumbs() {
             <div key={to} className="flex items-center">
               <BreadcrumbItem>
                 {isLast ? (
-                  <BreadcrumbPage>{title}</BreadcrumbPage>
+                  <BreadcrumbPage className="font-medium text-[#1F2937] dark:text-foreground">{title}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link to={to as any}>{title}</Link>
+                    <Link to={to as any} className="transition-colors hover:text-[#C97816]">{title}</Link>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>

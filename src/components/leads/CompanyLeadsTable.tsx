@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { can } from "@/lib/accessControl"
 
 interface CompanyLead {
   _id: string
@@ -122,11 +123,9 @@ export function CompanyLeadsTable({
     setPage(1)
   }, [status, city, debouncedSearch])
 
-  const canEdit = (company: CompanyLead) => {
-    if (!user) return false
-    if (user.role === "admin" || user._id === company.createdBy?._id) return true
-    return company.assignedTo?.some((assignedUser) => assignedUser._id === user._id) || false
-  }
+  const canEditLeads = can(user, "leads.edit")
+  const canDeleteLeads = can(user, "leads.delete")
+  const canAssignLeads = can(user, "leads.assign")
 
   const toggleAll = (checked: boolean) => {
     setSelectedIds((current) => checked
@@ -208,7 +207,7 @@ export function CompanyLeadsTable({
         </Select>
       </div>
 
-      {selectedIds.length > 0 && (
+      {canAssignLeads && selectedIds.length > 0 && (
         <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3 sm:flex-row sm:items-center sm:justify-between">
           <span className="text-sm font-medium">{selectedIds.length} company lead{selectedIds.length === 1 ? "" : "s"} selected</span>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -237,14 +236,16 @@ export function CompanyLeadsTable({
               <TableHeader className="bg-muted/50">
                 <TableRow>
                   <TableHead className="w-12">
-                    <Checkbox
-                      checked={allVisibleSelected ? true : selectedVisibleCount > 0 ? "indeterminate" : false}
-                      onCheckedChange={(checked) => toggleAll(checked === true)}
-                      aria-label="Select visible company leads"
-                    />
+                    {canAssignLeads && (
+                      <Checkbox
+                        checked={allVisibleSelected ? true : selectedVisibleCount > 0 ? "indeterminate" : false}
+                        onCheckedChange={(checked) => toggleAll(checked === true)}
+                        aria-label="Select visible company leads"
+                      />
+                    )}
                   </TableHead>
                   <TableHead>Company</TableHead>
-                  <TableHead>Primary Contact</TableHead>
+                  <TableHead>Primary Person Contact</TableHead>
                   <TableHead>Contact Info</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Assigned To</TableHead>
@@ -269,13 +270,15 @@ export function CompanyLeadsTable({
                 ) : companies.map((company) => (
                   <TableRow key={company._id} className="hover:bg-muted/30">
                     <TableCell>
-                      <Checkbox
-                        checked={selectedIds.includes(company._id)}
-                        onCheckedChange={(checked) => setSelectedIds((current) => checked
-                          ? Array.from(new Set([...current, company._id]))
-                          : current.filter((id) => id !== company._id))}
-                        aria-label={`Select ${company.companyName}`}
-                      />
+                      {canAssignLeads && (
+                        <Checkbox
+                          checked={selectedIds.includes(company._id)}
+                          onCheckedChange={(checked) => setSelectedIds((current) => checked
+                            ? Array.from(new Set([...current, company._id]))
+                            : current.filter((id) => id !== company._id))}
+                          aria-label={`Select ${company.companyName}`}
+                        />
+                      )}
                     </TableCell>
                     <TableCell>
                       <button
@@ -309,15 +312,15 @@ export function CompanyLeadsTable({
                         <Button variant="ghost" size="icon" title="View lead" onClick={() => navigate({ to: "/leads/$id", params: { id: company._id } })}>
                           <Eye className="h-4 w-4 text-blue-500" />
                         </Button>
-                        {canEdit(company) && (
-                          <>
+                        {canEditLeads && (
                             <Button variant="ghost" size="icon" title="Edit lead" onClick={() => navigate({ to: "/leads/$id/edit", params: { id: company._id } })}>
                               <Pencil className="h-4 w-4 text-orange-500" />
                             </Button>
+                        )}
+                        {canDeleteLeads && (
                             <Button variant="ghost" size="icon" title="Delete lead" onClick={() => deleteCompany(company)}>
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
-                          </>
                         )}
                       </div>
                     </TableCell>

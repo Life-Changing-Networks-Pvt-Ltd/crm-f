@@ -29,10 +29,15 @@ export function UserDropdown() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
+        <Button
+          variant="ghost"
+          className="relative h-9 w-9 rounded-full p-0 hover:bg-[#FFF3E3] focus-visible:ring-[#C97816] dark:hover:bg-accent"
+        >
+          <Avatar className="h-8 w-8 ring-2 ring-[#F3D4AD] ring-offset-2 ring-offset-[#FFFCF8] dark:ring-border dark:ring-offset-background">
             <AvatarImage src="/avatars/01.png" alt="@user" />
-            <AvatarFallback>{user?.name?.charAt(0) || "U"}</AvatarFallback>
+            <AvatarFallback className="bg-[#C97816] font-semibold text-white">
+              {user?.name?.charAt(0) || "U"}
+            </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>

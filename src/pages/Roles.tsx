@@ -1,19 +1,11 @@
-import { useState, useEffect } from "react"
-import { PageHeader } from "@/components/layout/PageHeader"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Shield, Plus, Pencil, Trash2, Loader2 } from "lucide-react"
-import api from "../services/api"
+import { useEffect, useState } from "react"
+import { useNavigate } from "@tanstack/react-router"
+import { KeyRound, Loader2, Pencil, Plus, Shield, Trash2 } from "lucide-react"
 import Swal from "sweetalert2"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+
+import { PageHeader } from "@/components/layout/PageHeader"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -23,6 +15,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   Select,
   SelectContent,
@@ -30,236 +24,262 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import api from "@/services/api"
+import { useSelector } from "react-redux"
+import type { RootState } from "@/store"
+import { can } from "@/lib/accessControl"
 
 interface Role {
-  _id: string;
-  name: string;
-  level: string;
-  usersCount: number;
-  createdBy: {
-    _id: string;
-    name: string;
-  };
+  _id: string
+  name: string
+  level: string
+  usersCount: number
+  status?: "active" | "inactive"
+  isSystemRole?: boolean
+  grants?: string[]
+  effectiveGrants?: string[]
+  createdBy?: { _id: string; name: string }
+}
+
+const defaultForm = {
+  name: "",
+  level: "Level 4",
+  status: "active" as "active" | "inactive",
 }
 
 export default function Roles() {
+  const user = useSelector((state: RootState) => state.auth.user)
+  const canManage = can(user, "admin.roles.manage")
+  const navigate = useNavigate()
   const [roles, setRoles] = useState<Role[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  
-  const [newRoleName, setNewRoleName] = useState("")
-  const [newRoleLevel, setNewRoleLevel] = useState("Level 4")
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [editingRole, setEditingRole] = useState<Role | null>(null)
+  const [form, setForm] = useState(defaultForm)
 
-  useEffect(() => {
-    fetchRoles()
-  }, [])
-
-  const fetchRoles = async () => {
+  const loadRoles = async () => {
     try {
       setIsLoading(true)
-      const res = await api.get('/roles')
-      setRoles(res.data.data)
+      const response = await api.get("/roles")
+      setRoles(response.data.data || [])
     } catch (error: any) {
-      console.error("Failed to fetch roles:", error)
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Failed to load roles from the server.'
-      })
+      Swal.fire("Error", error.response?.data?.message || "Failed to load roles", "error")
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleCreateRole = async () => {
-    if (!newRoleName.trim()) return
+  useEffect(() => {
+    void loadRoles()
+  }, [])
 
+  const openCreate = () => {
+    setEditingRole(null)
+    setForm(defaultForm)
+    setIsDialogOpen(true)
+  }
+
+  const openEdit = (role: Role) => {
+    setEditingRole(role)
+    setForm({
+      name: role.name,
+      level: role.level,
+      status: role.status || "active",
+    })
+    setIsDialogOpen(true)
+  }
+
+  const saveRole = async () => {
+    if (!form.name.trim()) {
+      Swal.fire("Role name required", "Please enter a role name.", "warning")
+      return
+    }
     try {
       setIsSaving(true)
-      const res = await api.post('/roles', {
-        name: newRoleName,
-        level: newRoleLevel
-      })
-      
-      setRoles([...roles, res.data.data])
-      setNewRoleName("")
-      setNewRoleLevel("Level 4")
+      if (editingRole) {
+        await api.put(`/roles/${editingRole._id}`, form)
+      } else {
+        await api.post("/roles", form)
+      }
+      await loadRoles()
       setIsDialogOpen(false)
-      
-      Swal.fire({
-        icon: 'success',
-        title: 'Role Created',
-        text: 'Role has been successfully saved to the database.',
-        timer: 2000,
-        showConfirmButton: false
+      await Swal.fire({
+        icon: "success",
+        title: editingRole ? "Role updated" : "Role created",
+        timer: 1500,
+        showConfirmButton: false,
       })
     } catch (error: any) {
-      console.error("Failed to create role:", error)
-      Swal.fire({
-        icon: 'error',
-        title: 'Failed to create role',
-        text: error.response?.data?.message || 'Server error occurred'
-      })
+      Swal.fire("Unable to save role", error.response?.data?.message || "Server error occurred", "error")
     } finally {
       setIsSaving(false)
     }
   }
 
-  const handleDeleteRole = async (id: string) => {
-    try {
-      const result = await Swal.fire({
-        title: 'Are you sure?',
-        text: "You won't be able to revert this!",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Yes, delete it!'
-      })
+  const deleteRole = async (role: Role) => {
+    const result = await Swal.fire({
+      title: `Delete ${role.name}?`,
+      text: "A role assigned to users cannot be deleted.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Delete role",
+      confirmButtonColor: "#dc2626",
+    })
+    if (!result.isConfirmed) return
 
-      if (result.isConfirmed) {
-        await api.delete(`/roles/${id}`)
-        setRoles(roles.filter(role => role._id !== id))
-        Swal.fire(
-          'Deleted!',
-          'Role has been deleted.',
-          'success'
-        )
-      }
+    try {
+      await api.delete(`/roles/${role._id}`)
+      setRoles((current) => current.filter((item) => item._id !== role._id))
+      void Swal.fire("Deleted", "Role has been deleted.", "success")
     } catch (error: any) {
-      console.error("Failed to delete role:", error)
-      Swal.fire({
-        icon: 'error',
-        title: 'Delete Failed',
-        text: error.response?.data?.message || 'Server error occurred'
-      })
+      void Swal.fire("Delete failed", error.response?.data?.message || "Unable to delete role", "error")
     }
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <PageHeader 
-          title="Roles & Permissions" 
-          description="Manage access levels and permissions for your team members." 
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <PageHeader
+          title="Roles & Permissions"
+          description="Create reusable job roles, then configure their actions and data visibility."
         />
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="shrink-0 gap-2">
-              <Plus className="h-4 w-4" />
-              Create Role
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Create New Role</DialogTitle>
-              <DialogDescription>
-                Add a new role and assign its priority level. You can configure detailed permissions later.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Role Name</Label>
-                <Input 
-                  id="name" 
-                  placeholder="e.g. Senior Manager" 
-                  value={newRoleName}
-                  onChange={(e) => setNewRoleName(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="level">Priority Level</Label>
-                <Select value={newRoleLevel} onValueChange={setNewRoleLevel}>
-                  <SelectTrigger id="level">
-                    <SelectValue placeholder="Select a level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Level 2">Level 2 (High Priority)</SelectItem>
-                    <SelectItem value="Level 3">Level 3 (Medium Priority)</SelectItem>
-                    <SelectItem value="Level 4">Level 4 (Standard Priority)</SelectItem>
-                    <SelectItem value="Level 5">Level 5 (Restricted Priority)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isSaving}>Cancel</Button>
-              <Button onClick={handleCreateRole} disabled={isSaving}>
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Role"}
+        <div className="flex flex-wrap gap-2">
+          {canManage && <Button variant="outline" className="gap-2" onClick={() => navigate({ to: "/page-access" })}>
+            <KeyRound className="h-4 w-4" />
+            Configure Access
+          </Button>}
+          {canManage && <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2" onClick={openCreate}>
+                <Plus className="h-4 w-4" /> Create Role
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle>{editingRole ? "Edit Role" : "Create Role"}</DialogTitle>
+                <DialogDescription>
+                  Define the role identity here. Detailed access is configured separately.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-3">
+                <div className="grid gap-2">
+                  <Label htmlFor="role-name">Role Name</Label>
+                  <Input
+                    id="role-name"
+                    value={form.name}
+                    onChange={(event) => setForm({ ...form, name: event.target.value })}
+                    placeholder="e.g. Sales Executive"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Priority Level</Label>
+                  <Select value={form.level} onValueChange={(level) => setForm({ ...form, level })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Level 2">Level 2 — High</SelectItem>
+                      <SelectItem value="Level 3">Level 3 — Medium</SelectItem>
+                      <SelectItem value="Level 4">Level 4 — Standard</SelectItem>
+                      <SelectItem value="Level 5">Level 5 — Restricted</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Status</Label>
+                  <Select
+                    value={form.status}
+                    onValueChange={(status: "active" | "inactive") => setForm({ ...form, status })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+                <Button onClick={saveRole} disabled={isSaving}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {editingRole ? "Save Changes" : "Create Role"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>}
+        </div>
       </div>
 
-      <div className="rounded-md border bg-card">
+      <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[250px]">Role Name</TableHead>
-              <TableHead>Priority Level</TableHead>
-              <TableHead>Assigned Users</TableHead>
-              <TableHead>Created By</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Level</TableHead>
+              <TableHead>Users</TableHead>
+              <TableHead>Allowed Actions</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    <p>Loading roles...</p>
-                  </div>
+                <TableCell colSpan={6} className="h-32 text-center">
+                  <Loader2 className="mx-auto h-7 w-7 animate-spin text-primary" />
                 </TableCell>
               </TableRow>
             ) : roles.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                  <div className="flex flex-col items-center justify-center gap-2">
-                    <Shield className="h-8 w-8 opacity-20" />
-                    <p>No roles found. Create one to get started.</p>
-                  </div>
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                  No roles found. Create the first role to continue.
                 </TableCell>
               </TableRow>
-            ) : (
-              roles.map((role) => (
-                <TableRow key={role._id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-muted-foreground" />
-                      {role.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={role.level.includes("1") ? "destructive" : role.level.includes("2") ? "default" : "secondary"}>
-                      {role.level}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{role.usersCount} users</TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {role.createdBy?.name || "System"}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleDeleteRole(role._id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
+            ) : roles.map((role) => (
+              <TableRow key={role._id}>
+                <TableCell>
+                  <div className="flex items-center gap-2 font-medium">
+                    <Shield className="h-4 w-4 text-primary" />
+                    {role.name}
+                    {role.isSystemRole && <Badge variant="outline">System</Badge>}
+                  </div>
+                </TableCell>
+                <TableCell><Badge variant="secondary">{role.level}</Badge></TableCell>
+                <TableCell>{role.usersCount || 0}</TableCell>
+                <TableCell>{role.effectiveGrants?.length || role.grants?.length || 0}</TableCell>
+                <TableCell>
+                  <Badge variant={role.status === "inactive" ? "outline" : "default"}>
+                    {role.status || "active"}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  {canManage && (
+                  <div className="flex justify-end gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(role)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive"
+                      disabled={role.isSystemRole}
+                      onClick={() => deleteRole(role)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </div>
