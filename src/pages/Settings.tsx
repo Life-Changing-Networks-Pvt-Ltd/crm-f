@@ -12,6 +12,8 @@ import { setSettings } from "@/store/slices/settingsSlice"
 import api from "@/services/api"
 import { toast } from "sonner"
 import { Moon, Sun, Laptop } from "lucide-react"
+import { queryClient } from "@/lib/queryClient"
+import { referenceQueryKeys } from "@/hooks/useCrmReferenceData"
 
 export default function Settings() {
   const { theme, setTheme } = useTheme()
@@ -44,6 +46,7 @@ export default function Settings() {
       setLoading(true)
       const res = await api.put('/settings', formData)
       dispatch(setSettings(res.data.data))
+      queryClient.setQueryData(referenceQueryKeys.settings, res.data.data)
       toast.success("Settings updated successfully")
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to save settings")

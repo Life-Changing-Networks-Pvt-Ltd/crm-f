@@ -6,7 +6,9 @@ import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { store, type RootState } from './store';
 import { router } from './routes/router';
 import { queryClient } from './lib/queryClient';
-import { crmQueryKeys, fetchCurrentUser, fetchSettings } from './lib/crmQueries';
+import { crmQueryKeys, fetchCurrentUser } from './lib/crmQueries';
+import { settingsQueryOptions } from './hooks/useCrmReferenceData';
+import { clearPersistedQueryCache } from './lib/queryClient';
 import './index.css';
 import { Toaster } from '@/components/ui/sonner';
 
@@ -25,13 +27,12 @@ function App() {
     queryKey: crmQueryKeys.currentUser,
     queryFn: fetchCurrentUser,
     enabled: isAuthenticated,
-    staleTime: 0,
+    staleTime: 5 * 60_000,
     retry: false,
   });
 
   const settingsQuery = useQuery({
-    queryKey: crmQueryKeys.settings,
-    queryFn: fetchSettings,
+    ...settingsQueryOptions(),
     enabled: isAuthenticated,
   });
 
@@ -44,6 +45,7 @@ function App() {
   useEffect(() => {
     if (currentUserQuery.isError && isAuthenticated) {
       console.error('Session expired or failed to fetch user:', currentUserQuery.error);
+      clearPersistedQueryCache();
       dispatch(logoutUser());
     }
   }, [currentUserQuery.error, currentUserQuery.isError, dispatch, isAuthenticated]);

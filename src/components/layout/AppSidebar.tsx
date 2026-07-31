@@ -39,6 +39,7 @@ import { Link as RouterLink, useLocation } from "@tanstack/react-router"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { canOpenPage } from "@/lib/accessControl"
+import { prefetchPageData } from "@/lib/pagePrefetch"
 
 const navItems = [
   {
@@ -154,7 +155,11 @@ export function AppSidebar() {
                       tooltip={item.title}
                       className="rounded-xl text-[#374151] transition-colors duration-200 hover:bg-[#FFF3E3] hover:text-[#A85F08] focus-visible:ring-[#C97816] active:bg-[#FFE8CC] active:text-[#A85F08] data-[active=true]:bg-[#C97816] data-[active=true]:font-semibold data-[active=true]:text-white data-[active=true]:shadow-[0_6px_16px_rgba(201,120,22,0.22)] data-[active=true]:hover:bg-[#A95F0B] data-[active=true]:hover:text-white data-[active=true]:active:bg-[#A95F0B] data-[active=true]:active:text-white data-[active=true]:[&>svg]:text-white"
                     >
-                      <RouterLink to={item.url as any}>
+                      <RouterLink
+                        to={item.url as any}
+                        onMouseEnter={() => prefetchPageData(item.url)}
+                        onFocus={() => prefetchPageData(item.url)}
+                      >
                         <item.icon />
                         <span>{item.title}</span>
                       </RouterLink>

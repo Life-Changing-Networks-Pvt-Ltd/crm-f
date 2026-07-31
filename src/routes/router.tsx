@@ -1,11 +1,11 @@
 import { createRootRouteWithContext, createRoute, createRouter, Outlet, redirect } from '@tanstack/react-router';
-import Login from '../pages/Login';
-import Dashboard from '../pages/Dashboard';
 import { AppShell } from '../components/layout/AppShell';
 import { lazyPage } from '../components/layout/lazyPage';
 import type { User } from '../store/slices/authSlice';
 import { can } from '../lib/accessControl';
 
+const Login = lazyPage(() => import('../pages/Login'));
+const Dashboard = lazyPage(() => import('../pages/Dashboard'));
 const Leads = lazyPage(() => import('../pages/Leads'));
 const AllLeads = lazyPage(() => import('../pages/AllLeads'));
 const UnifiedLeadDetails = lazyPage(() => import('../pages/UnifiedLeadDetails'));
@@ -242,6 +242,8 @@ const routeTree = rootRoute.addChildren([
 
 export const router = createRouter({
   routeTree,
+  defaultPreload: 'intent',
+  defaultPreloadStaleTime: 2 * 60_000,
   context: {
     auth: undefined!, // We'll pass this in via a wrapper
   },

@@ -18,6 +18,8 @@ import api from "@/services/api"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { can } from "@/lib/accessControl"
+import { referenceQueryKeys, useRoleCatalogQuery, useRolesQuery } from "@/hooks/useCrmReferenceData"
+import { queryClient } from "@/lib/queryClient"
 
 interface PermissionDefinition {
   key: string
@@ -59,12 +61,14 @@ const scopeLabels: Record<string, string> = {
 export default function PageAccess() {
   const user = useSelector((state: RootState) => state.auth.user)
   const canManage = can(user, "admin.roles.manage")
-  const [roles, setRoles] = useState<RoleData[]>([])
-  const [catalog, setCatalog] = useState<PermissionCatalog | null>(null)
+  const rolesQuery = useRolesQuery<RoleData[]>()
+  const catalogQuery = useRoleCatalogQuery<PermissionCatalog>()
+  const roles = rolesQuery.data || []
+  const catalog = catalogQuery.data || null
   const [selectedRoleId, setSelectedRoleId] = useState("")
   const [grants, setGrants] = useState<string[]>([])
   const [dataScopes, setDataScopes] = useState<Record<string, string>>({})
-  const [isLoading, setIsLoading] = useState(true)
+  const isLoading = rolesQuery.isLoading || catalogQuery.isLoading
   const [isSaving, setIsSaving] = useState(false)
 
   const selectedRole = useMemo(
@@ -73,23 +77,12 @@ export default function PageAccess() {
   )
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setIsLoading(true)
-        const [rolesResponse, catalogResponse] = await Promise.all([
-          api.get("/roles"),
-          api.get("/roles/catalog"),
-        ])
-        setRoles(rolesResponse.data.data || [])
-        setCatalog(catalogResponse.data.data)
-      } catch (error: any) {
-        Swal.fire("Error", error.response?.data?.message || "Failed to load access controls", "error")
-      } finally {
-        setIsLoading(false)
-      }
+    const error = rolesQuery.error || catalogQuery.error
+    if (error) {
+      const requestError = error as any
+      void Swal.fire("Error", requestError.response?.data?.message || "Failed to load access controls", "error")
     }
-    void load()
-  }, [])
+  }, [catalogQuery.error, rolesQuery.error])
 
   const selectRole = (roleId: string) => {
     const role = roles.find((item) => item._id === roleId)
@@ -125,7 +118,7 @@ export default function PageAccess() {
         dataScopes,
       })
       const saved = response.data.data as RoleData
-      setRoles((current) => current.map((role) => (
+      queryClient.setQueryData<RoleData[]>(referenceQueryKeys.roles, (current = []) => current.map((role) => (
         role._id === selectedRoleId
           ? { ...role, ...saved, effectiveGrants: saved.grants || [] }
           : role

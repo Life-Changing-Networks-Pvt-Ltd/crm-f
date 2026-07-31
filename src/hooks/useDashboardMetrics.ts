@@ -28,7 +28,8 @@ export const useDashboardMetrics = (filters: DashboardFilters) => useQuery({
   queryKey: ["dashboard", "metrics", filters.period, filters.month, filters.year],
   enabled: isValidDashboardFilter(filters),
   placeholderData: keepPreviousData,
-  staleTime: 30_000,
+  staleTime: 2 * 60_000,
+  gcTime: 30 * 60_000,
   queryFn: async ({ signal }) => {
     const params: Record<string, string> = { period: filters.period }
     if (filters.period === "month") params.month = filters.month

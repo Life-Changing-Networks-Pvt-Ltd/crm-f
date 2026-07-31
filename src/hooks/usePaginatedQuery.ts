@@ -17,7 +17,7 @@ export const usePaginatedQuery = <T>({
   limit = 25,
   params = {},
   enabled = true,
-  staleTime = 15_000,
+  staleTime = 2 * 60_000,
 }: PaginatedQueryOptions) => {
   const normalizedParams = Object.fromEntries(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== ""),
@@ -26,6 +26,7 @@ export const usePaginatedQuery = <T>({
     queryKey: ["paged", endpoint, page, limit, normalizedParams],
     enabled,
     staleTime,
+    gcTime: 30 * 60_000,
     placeholderData: keepPreviousData,
     queryFn: async ({ signal }) => {
       const response = await api.get(endpoint, {

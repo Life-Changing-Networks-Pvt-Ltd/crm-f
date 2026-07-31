@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { store } from '../store';
 import { logoutUser } from '../store/slices/authSlice';
-import { queryClient } from '@/lib/queryClient';
+import { clearPersistedQueryCache, queryClient } from '@/lib/queryClient';
 
 // Determine the base URL based on environment
 // For production, it will look for VITE_API_URL, then fallback to a generic api subdomain or relative path.
@@ -14,9 +14,6 @@ export const BACKEND_URL = getBaseUrl().replace(/\/api$/, '');
 const api = axios.create({
   baseURL: getBaseUrl(),
   withCredentials: true, // Important for sending/receiving cookies
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 const requestStartedAt = new WeakMap<object, number>();
@@ -63,6 +60,7 @@ api.interceptors.response.use(
     if (error.config) logClientTiming(error.config, error.response?.status);
     if (error.response && error.response.status === 401) {
       // Dispatch logout action to clear state
+      clearPersistedQueryCache();
       store.dispatch(logoutUser());
     }
     return Promise.reject(error);

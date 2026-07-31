@@ -45,6 +45,7 @@ import { DataPagination } from "@/components/shared/DataPagination"
 import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { can } from "@/lib/accessControl"
+import { useRoleCatalogQuery, useRolesQuery, useTeamsQuery, useUsersQuery } from "@/hooks/useCrmReferenceData"
 
 interface UserData {
   _id: string;
@@ -143,11 +144,15 @@ const scopeOptionLabel = (groupId: string, scope: string, userName: string) => {
 
 export default function Users() {
   const navigate = useNavigate()
-  const [roles, setRoles] = useState<RoleData[]>([])
-  const [teams, setTeams] = useState<TeamData[]>([])
-  const [permissionGroups, setPermissionGroups] = useState<PermissionGroup[]>([])
-  const [scopeOptions, setScopeOptions] = useState<string[]>([])
-  const [managerOptions, setManagerOptions] = useState<UserData[]>([])
+  const rolesQuery = useRolesQuery<RoleData[]>()
+  const teamsQuery = useTeamsQuery<TeamData[]>("active")
+  const managersQuery = useUsersQuery<UserData[]>("manager")
+  const catalogQuery = useRoleCatalogQuery<{ groups: PermissionGroup[]; dataScopes: string[] }>()
+  const roles = rolesQuery.data || []
+  const teams = teamsQuery.data || []
+  const managerOptions = managersQuery.data || []
+  const permissionGroups = catalogQuery.data?.groups || []
+  const scopeOptions = catalogQuery.data?.dataScopes || []
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search)
@@ -190,24 +195,16 @@ export default function Users() {
       navigate({ to: '/' })
       return
     }
-    if (can(currentUser, "admin.users.manage")) {
-      fetchReferenceData()
-    }
   }, [currentUser, navigate])
 
   const fetchReferenceData = async () => {
     try {
-      const [rolesRes, managersRes, teamsRes, catalogRes] = await Promise.all([
-        api.get('/roles'),
-        api.get('/users/options', { params: { purpose: "manager" } }),
-        api.get('/teams', { params: { status: "active" } }),
-        api.get('/roles/catalog'),
+      await Promise.all([
+        rolesQuery.refetch(),
+        managersQuery.refetch(),
+        teamsQuery.refetch(),
+        catalogQuery.refetch(),
       ])
-      setRoles(rolesRes.data.data)
-      setManagerOptions(managersRes.data.data || [])
-      setTeams(teamsRes.data.data || [])
-      setPermissionGroups(catalogRes.data.data?.groups || [])
-      setScopeOptions(catalogRes.data.data?.dataScopes || [])
     } catch (error: any) {
       console.error("Failed to fetch data:", error)
       Swal.fire({

@@ -27,6 +27,8 @@ import api from "@/services/api"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { can } from "@/lib/accessControl"
+import { useQuery } from "@tanstack/react-query"
+import { useRolesQuery, useTeamsQuery, useUsersQuery } from "@/hooks/useCrmReferenceData"
 
 interface Option {
   _id: string
@@ -75,40 +77,42 @@ export default function TemplateAccess() {
     || (template.resourceType === "email_template" && can(user, "email.templates.share"))
     || (template.resourceType === "whatsapp_template" && can(user, "whatsapp.templates.share"))
   )
-  const [templates, setTemplates] = useState<TemplateResource[]>([])
-  const [roles, setRoles] = useState<Option[]>([])
-  const [teams, setTeams] = useState<Option[]>([])
-  const [users, setUsers] = useState<Option[]>([])
+  const templatesQuery = useQuery({
+    queryKey: ["template-access"],
+    queryFn: async () => (await api.get("/template-access")).data.data as TemplateResource[],
+    staleTime: 2 * 60_000,
+    gcTime: 30 * 60_000,
+  })
+  const rolesQuery = useRolesQuery<Option[]>()
+  const teamsQuery = useTeamsQuery<Option[]>("active")
+  const usersQuery = useUsersQuery<Option[]>("meeting")
+  const templates = templatesQuery.data || []
+  const roles = rolesQuery.data || []
+  const teams = teamsQuery.data || []
+  const users = usersQuery.data || []
   const [channel, setChannel] = useState<"all" | "email_template" | "whatsapp_template">("all")
   const [search, setSearch] = useState("")
   const [selected, setSelected] = useState<TemplateResource | null>(null)
   const [shareForm, setShareForm] = useState(emptyShareForm)
-  const [isLoading, setIsLoading] = useState(true)
+  const isLoading = templatesQuery.isLoading || rolesQuery.isLoading || teamsQuery.isLoading || usersQuery.isLoading
   const [isSaving, setIsSaving] = useState(false)
 
   const load = async () => {
-    try {
-      setIsLoading(true)
-      const [templateResponse, roleResponse, teamResponse, userResponse] = await Promise.all([
-        api.get("/template-access"),
-        api.get("/roles"),
-        api.get("/teams", { params: { status: "active" } }),
-        api.get("/users/options", { params: { purpose: "meeting" } }),
-      ])
-      setTemplates(templateResponse.data.data || [])
-      setRoles(roleResponse.data.data || [])
-      setTeams(teamResponse.data.data || [])
-      setUsers(userResponse.data.data || [])
-    } catch (error: any) {
-      Swal.fire("Error", error.response?.data?.message || "Failed to load template access", "error")
-    } finally {
-      setIsLoading(false)
-    }
+    await Promise.all([
+      templatesQuery.refetch(),
+      rolesQuery.refetch(),
+      teamsQuery.refetch(),
+      usersQuery.refetch(),
+    ])
   }
 
   useEffect(() => {
-    void load()
-  }, [])
+    const error = templatesQuery.error || rolesQuery.error || teamsQuery.error || usersQuery.error
+    if (error) {
+      const requestError = error as any
+      void Swal.fire("Error", requestError.response?.data?.message || "Failed to load template access", "error")
+    }
+  }, [rolesQuery.error, teamsQuery.error, templatesQuery.error, usersQuery.error])
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase()

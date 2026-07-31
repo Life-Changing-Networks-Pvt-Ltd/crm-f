@@ -36,6 +36,9 @@ import api from "@/services/api"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { can } from "@/lib/accessControl"
+import { useRolesQuery } from "@/hooks/useCrmReferenceData"
+import { queryClient } from "@/lib/queryClient"
+import { referenceQueryKeys } from "@/hooks/useCrmReferenceData"
 
 interface Role {
   _id: string
@@ -59,28 +62,20 @@ export default function Roles() {
   const user = useSelector((state: RootState) => state.auth.user)
   const canManage = can(user, "admin.roles.manage")
   const navigate = useNavigate()
-  const [roles, setRoles] = useState<Role[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const rolesQuery = useRolesQuery<Role[]>()
+  const roles = rolesQuery.data || []
+  const isLoading = rolesQuery.isLoading
   const [isSaving, setIsSaving] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [form, setForm] = useState(defaultForm)
 
-  const loadRoles = async () => {
-    try {
-      setIsLoading(true)
-      const response = await api.get("/roles")
-      setRoles(response.data.data || [])
-    } catch (error: any) {
-      Swal.fire("Error", error.response?.data?.message || "Failed to load roles", "error")
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
   useEffect(() => {
-    void loadRoles()
-  }, [])
+    if (rolesQuery.error) {
+      const error = rolesQuery.error as any
+      void Swal.fire("Error", error.response?.data?.message || "Failed to load roles", "error")
+    }
+  }, [rolesQuery.error])
 
   const openCreate = () => {
     setEditingRole(null)
@@ -110,7 +105,7 @@ export default function Roles() {
       } else {
         await api.post("/roles", form)
       }
-      await loadRoles()
+      await rolesQuery.refetch()
       setIsDialogOpen(false)
       await Swal.fire({
         icon: "success",
@@ -138,7 +133,9 @@ export default function Roles() {
 
     try {
       await api.delete(`/roles/${role._id}`)
-      setRoles((current) => current.filter((item) => item._id !== role._id))
+      queryClient.setQueryData<Role[]>(referenceQueryKeys.roles, (current = []) =>
+        current.filter((item) => item._id !== role._id),
+      )
       void Swal.fire("Deleted", "Role has been deleted.", "success")
     } catch (error: any) {
       void Swal.fire("Delete failed", error.response?.data?.message || "Unable to delete role", "error")

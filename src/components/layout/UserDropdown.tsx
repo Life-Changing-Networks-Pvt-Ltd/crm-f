@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { logoutUser } from "@/store/slices/authSlice"
 import type { RootState } from "@/store"
+import { clearPersistedQueryCache } from "@/lib/queryClient"
 
 export function UserDropdown() {
   const navigate = useNavigate()
@@ -22,6 +23,7 @@ export function UserDropdown() {
   const user = useSelector((state: RootState) => state.auth.user)
 
   const handleLogout = () => {
+    clearPersistedQueryCache()
     dispatch(logoutUser())
     navigate({ to: "/login" })
   }

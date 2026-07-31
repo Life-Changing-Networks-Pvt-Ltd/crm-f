@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState } from "react"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { PageHeader } from "@/components/layout/PageHeader"
@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DataPagination } from "@/components/shared/DataPagination"
 import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
+import { useCompaniesQuery, useCustomersQuery, useUsersQuery } from "@/hooks/useCrmReferenceData"
 
 export default function Meetings() {
   const { user: currentUser } = useSelector((state: RootState) => state.auth)
@@ -50,10 +51,12 @@ export default function Meetings() {
   const [participant, setParticipant] = useState("")
   
   // Data for selects
-  const [users, setUsers] = useState<any[]>([])
-  const [customers, setCustomers] = useState<any[]>([])
-  const [companies, setCompanies] = useState<any[]>([])
-  const [participantsLoaded, setParticipantsLoaded] = useState(false)
+  const usersQuery = useUsersQuery<any[]>("meeting")
+  const customersQuery = useCustomersQuery<any[]>()
+  const companiesQuery = useCompaniesQuery<any[]>()
+  const users = usersQuery.data || []
+  const customers = customersQuery.data || []
+  const companies = companiesQuery.data || []
 
   const dateRange = useMemo(() => {
     if (dateFilter === "All") return {}
@@ -93,26 +96,6 @@ export default function Meetings() {
           isCreatedByMe: e.createdBy?._id === currentUser?._id
         }
       }), [data?.items, currentUser?._id])
-
-  useEffect(() => {
-    if (isModalOpen && !participantsLoaded) void fetchParticipantsData()
-  }, [isModalOpen, participantsLoaded])
-
-  const fetchParticipantsData = async () => {
-    try {
-      const [uRes, cRes, compRes] = await Promise.all([
-        api.get('/users/options', { params: { purpose: 'meeting' } }),
-        api.get('/customers/options'),
-        api.get('/companies/options')
-      ])
-      setUsers(uRes.data.data)
-      setCustomers(cRes.data.data)
-      setCompanies(compRes.data.data)
-      setParticipantsLoaded(true)
-    } catch (err) {
-      console.error(err)
-    }
-  }
 
   const handleCreate = async () => {
     if (!title || !date || !time) {

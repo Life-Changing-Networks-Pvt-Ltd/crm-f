@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSelector } from "react-redux";
 import type { RootState } from "@/store";
 import api from "@/services/api";
-import { io, Socket } from "socket.io-client";
+import type { Socket } from "socket.io-client";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { Send, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 // removed ScrollArea import
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useQuery } from "@tanstack/react-query";
+import { acquireRealtimeSocket, releaseRealtimeSocket } from "@/services/realtimeSocket";
 
 interface User {
   _id: string;
@@ -34,59 +36,59 @@ export default function Messages() {
   const [newMessage, setNewMessage] = useState("");
   const [socket, setSocket] = useState<Socket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const usersQuery = useQuery({
+    queryKey: ["messages", "users"],
+    queryFn: async () => (await api.get('/messages/users')).data as User[],
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+  });
+  const messagesQuery = useQuery({
+    queryKey: ["messages", selectedUser?._id],
+    enabled: Boolean(selectedUser?._id),
+    queryFn: async () => (await api.get(`/messages/${selectedUser!._id}`)).data as Message[],
+    staleTime: 2 * 60_000,
+    gcTime: 30 * 60_000,
+  });
 
   useEffect(() => {
     // Initialize Socket.io
-    const newSocket = io(import.meta.env.VITE_API_URL || "http://localhost:8080");
+    const newSocket = acquireRealtimeSocket(currentUser?._id);
     setSocket(newSocket);
 
-    if (currentUser?._id) {
-      newSocket.emit("register", currentUser._id);
-    }
-
-    newSocket.on("receive_message", (message: Message) => {
+    const receiveMessage = (message: Message) => {
       setMessages((prev) => {
         // Only append if it's from the currently selected user (or if we want to show a badge, we'd handle it differently)
         return [...prev, message];
       });
-    });
+    };
+    newSocket.on("receive_message", receiveMessage);
 
     return () => {
-      newSocket.disconnect();
+      newSocket.off("receive_message", receiveMessage);
+      releaseRealtimeSocket(newSocket);
+      setSocket(null);
     };
-  }, [currentUser]);
+  }, [currentUser?._id]);
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    setUsers(usersQuery.data || []);
+  }, [usersQuery.data]);
 
   useEffect(() => {
-    if (selectedUser) {
-      fetchMessages(selectedUser._id);
-    }
-  }, [selectedUser]);
+    if (messagesQuery.data) setMessages(messagesQuery.data);
+  }, [messagesQuery.data]);
+
+  useEffect(() => {
+    if (usersQuery.error) toast.error("Failed to load users");
+  }, [usersQuery.error]);
+
+  useEffect(() => {
+    if (messagesQuery.error) toast.error("Failed to load messages");
+  }, [messagesQuery.error]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  const fetchUsers = async () => {
-    try {
-      const res = await api.get('/messages/users');
-      setUsers(res.data);
-    } catch (error) {
-      toast.error("Failed to load users");
-    }
-  };
-
-  const fetchMessages = async (userId: string) => {
-    try {
-      const res = await api.get(`/messages/${userId}`);
-      setMessages(res.data);
-    } catch (error) {
-      toast.error("Failed to load messages");
-    }
-  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();

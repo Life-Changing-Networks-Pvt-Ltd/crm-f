@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { useSelector } from "react-redux"
-import { io } from "socket.io-client"
 import { AlertTriangle, BellRing, CalendarClock, Check, Clock3, ExternalLink, Loader2 } from "lucide-react"
 import type { RootState } from "@/store"
-import api, { BACKEND_URL } from "@/services/api"
+import api from "@/services/api"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
+import { acquireRealtimeSocket, releaseRealtimeSocket } from "@/services/realtimeSocket"
 
 interface FollowUpReminder {
   _id: string
@@ -42,6 +42,7 @@ export function FollowUpReminderCenter() {
   const [workingId, setWorkingId] = useState<string | null>(null)
   const [workingAction, setWorkingAction] = useState<"snooze" | "complete" | null>(null)
   const snoozedUntil = useRef(new Map<string, number>())
+  const hasConnected = useRef(false)
 
   const loadPending = useCallback(async () => {
     if (!user?._id) return
@@ -62,18 +63,19 @@ export function FollowUpReminderCenter() {
       return
     }
     void loadPending()
-    const socketUrl = BACKEND_URL || window.location.origin
-    const socket = io(socketUrl, { transports: ["websocket", "polling"] })
+    const socket = acquireRealtimeSocket(user._id)
+    hasConnected.current = socket.connected
     const register = () => {
-      socket.emit("register", user._id)
-      void loadPending()
+      if (hasConnected.current) void loadPending()
+      hasConnected.current = true
     }
-    socket.on("connect", register)
-    socket.on("follow_up_reminder", (reminder: FollowUpReminder) => {
+    const receiveReminder = (reminder: FollowUpReminder) => {
       if ((snoozedUntil.current.get(reminder._id) || 0) > Date.now()) return
       snoozedUntil.current.delete(reminder._id)
       setReminders((current) => mergeReminder(current, reminder))
-    })
+    }
+    socket.on("connect", register)
+    socket.on("follow_up_reminder", receiveReminder)
     const recoverWhenVisible = () => {
       if (document.visibilityState === "visible") void loadPending()
     }
@@ -82,7 +84,10 @@ export function FollowUpReminderCenter() {
     window.addEventListener("follow-up-updated", loadPending)
     window.addEventListener("follow-up-reminders-refresh", loadPending)
     return () => {
-      socket.disconnect()
+      hasConnected.current = false
+      socket.off("connect", register)
+      socket.off("follow_up_reminder", receiveReminder)
+      releaseRealtimeSocket(socket)
       document.removeEventListener("visibilitychange", recoverWhenVisible)
       window.removeEventListener("online", loadPending)
       window.removeEventListener("follow-up-updated", loadPending)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, Briefcase, CalendarDays, Activity, Loader2 } from "lucide-react"
@@ -7,27 +7,24 @@ import api from "@/services/api"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useQuery } from "@tanstack/react-query"
 
 export default function DashboardReports() {
-  const [loading, setLoading] = useState(true)
-  const [data, setData] = useState<any>(null)
   const [dateFilter, setDateFilter] = useState("All")
-
+  const reportQuery = useQuery({
+    queryKey: ["reports", "dashboard"],
+    queryFn: async () => (await api.get('/reports/dashboard')).data.data,
+    staleTime: 2 * 60_000,
+    gcTime: 30 * 60_000,
+  })
+  const data = reportQuery.data
+  const loading = reportQuery.isLoading
   useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
-    try {
-      setLoading(true)
-      const res = await api.get('/reports/dashboard')
-      setData(res.data.data)
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to load report")
-    } finally {
-      setLoading(false)
+    if (reportQuery.error) {
+      const error = reportQuery.error as any
+      toast.error(error.response?.data?.message || "Failed to load report")
     }
-  }
+  }, [reportQuery.error])
 
   const metrics = [
     { title: "Total Leads", value: data?.metrics?.totalLeads || 0, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },

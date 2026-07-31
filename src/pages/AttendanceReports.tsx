@@ -8,11 +8,10 @@ import { Loader2, CalendarRange } from "lucide-react"
 import api from "@/services/api"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
+import { useUsersQuery } from "@/hooks/useCrmReferenceData"
 
 export default function AttendanceReports() {
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(false)
-  
   // Filters
   const [startDate, setStartDate] = useState(() => {
     const d = new Date()
@@ -22,39 +21,27 @@ export default function AttendanceReports() {
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0])
   const [userId, setUserId] = useState<string>("all")
   
-  const [employees, setEmployees] = useState<any[]>([])
-
-  useEffect(() => {
-    fetchEmployees()
-  }, [])
-
-  useEffect(() => {
-    fetchReportData()
-  }, [startDate, endDate, userId])
-
-  const fetchEmployees = async () => {
-    try {
-      const usersRes = await api.get('/users/options', { params: { purpose: 'attendance' } })
-      setEmployees(usersRes.data.data || [])
-    } catch (err) {
-      console.log("Failed to fetch employees")
-    }
-  }
-
-  const fetchReportData = async () => {
-    if (!startDate || !endDate) return
-
-    try {
-      setLoading(true)
+  const employeesQuery = useUsersQuery<any[]>("attendance")
+  const employees = employeesQuery.data || []
+  const reportQuery = useQuery<any[]>({
+    queryKey: ["reports", "attendance", startDate, endDate, userId],
+    enabled: Boolean(startDate && endDate),
+    queryFn: async () => {
       const endpoint = `/attendance/report?startDate=${startDate}&endDate=${endDate}${userId !== 'all' ? `&userId=${userId}` : ''}`
-      const res = await api.get(endpoint)
-      setData(res.data.data || [])
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to fetch attendance report")
-    } finally {
-      setLoading(false)
+      return (await api.get(endpoint)).data.data || []
+    },
+    staleTime: 2 * 60_000,
+    gcTime: 30 * 60_000,
+    placeholderData: keepPreviousData,
+  })
+  const data = reportQuery.data || []
+  const loading = reportQuery.isLoading
+  useEffect(() => {
+    if (reportQuery.error) {
+      const error = reportQuery.error as any
+      toast.error(error.response?.data?.message || "Failed to fetch attendance report")
     }
-  }
+  }, [reportQuery.error])
 
   const getStatusBadge = (status: string) => {
     switch (status) {

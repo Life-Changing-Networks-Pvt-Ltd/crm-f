@@ -1,12 +1,35 @@
+import { lazy, Suspense, useEffect, useState } from "react"
 import { Outlet } from "@tanstack/react-router"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "./AppSidebar"
 import { AppNavbar } from "./AppNavbar"
-import { GlobalStickyNotes } from "../shared/GlobalStickyNotes"
-import { BrowserCallDialog } from "../shared/BrowserCallDialog"
-import { FollowUpReminderCenter } from "../shared/FollowUpReminderCenter"
+
+const GlobalStickyNotes = lazy(() => import("../shared/GlobalStickyNotes").then((module) => ({
+  default: module.GlobalStickyNotes,
+})))
+const BrowserCallDialog = lazy(() => import("../shared/BrowserCallDialog").then((module) => ({
+  default: module.BrowserCallDialog,
+})))
+const FollowUpReminderCenter = lazy(() => import("../shared/FollowUpReminderCenter").then((module) => ({
+  default: module.FollowUpReminderCenter,
+})))
 
 export function AppShell() {
+  const [loadUtilities, setLoadUtilities] = useState(false)
+
+  useEffect(() => {
+    const browser = window as typeof window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    if (browser.requestIdleCallback) {
+      const id = browser.requestIdleCallback(() => setLoadUtilities(true), { timeout: 1_500 })
+      return () => browser.cancelIdleCallback?.(id)
+    }
+    const id = window.setTimeout(() => setLoadUtilities(true), 1_200)
+    return () => window.clearTimeout(id)
+  }, [])
+
   return (
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background flex-col lg:flex-row">
@@ -18,9 +41,13 @@ export function AppShell() {
           </main>
         </div>
       </div>
-      <GlobalStickyNotes />
-      <BrowserCallDialog />
-      <FollowUpReminderCenter />
+      {loadUtilities && (
+        <Suspense fallback={null}>
+          <GlobalStickyNotes />
+          <BrowserCallDialog />
+          <FollowUpReminderCenter />
+        </Suspense>
+      )}
     </SidebarProvider>
   )
 }

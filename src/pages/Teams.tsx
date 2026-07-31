@@ -29,6 +29,7 @@ import api from "@/services/api"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { can } from "@/lib/accessControl"
+import { useRolesQuery, useTeamsQuery, useUsersQuery } from "@/hooks/useCrmReferenceData"
 
 interface UserOption {
   _id: string
@@ -66,36 +67,29 @@ const emptyForm = {
 export default function Teams() {
   const user = useSelector((state: RootState) => state.auth.user)
   const canManage = can(user, "admin.teams.manage")
-  const [teams, setTeams] = useState<Team[]>([])
-  const [users, setUsers] = useState<UserOption[]>([])
-  const [roles, setRoles] = useState<RoleOption[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const teamsQuery = useTeamsQuery<Team[]>("all")
+  const usersQuery = useUsersQuery<UserOption[]>("meeting")
+  const rolesQuery = useRolesQuery<RoleOption[]>()
+  const teams = teamsQuery.data || []
+  const users = usersQuery.data || []
+  const roles = rolesQuery.data || []
+  const isLoading = teamsQuery.isLoading || usersQuery.isLoading || rolesQuery.isLoading
   const [isSaving, setIsSaving] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [form, setForm] = useState(emptyForm)
 
   const load = async () => {
-    try {
-      setIsLoading(true)
-      const [teamsResponse, usersResponse, rolesResponse] = await Promise.all([
-        api.get("/teams", { params: { status: "all" } }),
-        api.get("/users/options", { params: { purpose: "meeting" } }),
-        api.get("/roles"),
-      ])
-      setTeams(teamsResponse.data.data || [])
-      setUsers(usersResponse.data.data || [])
-      setRoles(rolesResponse.data.data || [])
-    } catch (error: any) {
-      Swal.fire("Error", error.response?.data?.message || "Failed to load teams", "error")
-    } finally {
-      setIsLoading(false)
-    }
+    await Promise.all([teamsQuery.refetch(), usersQuery.refetch(), rolesQuery.refetch()])
   }
 
   useEffect(() => {
-    void load()
-  }, [])
+    const error = teamsQuery.error || usersQuery.error || rolesQuery.error
+    if (error) {
+      const requestError = error as any
+      void Swal.fire("Error", requestError.response?.data?.message || "Failed to load teams", "error")
+    }
+  }, [rolesQuery.error, teamsQuery.error, usersQuery.error])
 
   const openCreate = () => {
     setEditingTeam(null)

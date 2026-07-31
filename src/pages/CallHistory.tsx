@@ -9,29 +9,32 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import api from "@/services/api"
 import { toast } from "sonner"
+import { keepPreviousData, useQuery } from "@tanstack/react-query"
 
 const leadName = (call: any) => call.lead?.companyName || call.lead?.name || call.lead?.customerName || "Unknown lead"
 const duration = (seconds = 0) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`
 
 export default function CallHistory() {
   const navigate = useNavigate()
-  const [calls, setCalls] = useState<any[]>([])
   const [status, setStatus] = useState("all")
   const [page, setPage] = useState(1)
-  const [pages, setPages] = useState(1)
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
-
-  const load = async () => {
-    try {
-      setLoading(true)
-      const response = await api.get("/telephony/calls", { params: { page, status } })
-      const data = response.data.data
-      setCalls(data.calls || []); setPages(data.pages || 1); setTotal(data.total || 0)
-    } catch (error: any) { toast.error(error.response?.data?.message || "Could not load call history") }
-    finally { setLoading(false) }
-  }
-  useEffect(() => { load() }, [page, status])
+  const callsQuery = useQuery<{ calls: any[]; pages: number; total: number }>({
+    queryKey: ["calls", page, status],
+    queryFn: async () => (await api.get("/telephony/calls", { params: { page, status } })).data.data,
+    staleTime: 2 * 60_000,
+    gcTime: 30 * 60_000,
+    placeholderData: keepPreviousData,
+  })
+  const calls = callsQuery.data?.calls || []
+  const pages = callsQuery.data?.pages || 1
+  const total = callsQuery.data?.total || 0
+  const loading = callsQuery.isLoading
+  useEffect(() => {
+    if (callsQuery.error) {
+      const error = callsQuery.error as any
+      toast.error(error.response?.data?.message || "Could not load call history")
+    }
+  }, [callsQuery.error])
 
   return <div className="flex flex-col gap-6 pb-8">
     <PageHeader title="Call History" description="Review browser calls, recordings, transcripts, outcomes, and provider details." />
