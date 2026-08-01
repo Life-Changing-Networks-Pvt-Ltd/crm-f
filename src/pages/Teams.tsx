@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Loader2, Pencil, Plus, Users2, UserRound, XCircle } from "lucide-react"
 import Swal from "sweetalert2"
 
@@ -68,7 +68,7 @@ export default function Teams() {
   const user = useSelector((state: RootState) => state.auth.user)
   const canManage = can(user, "admin.teams.manage")
   const teamsQuery = useTeamsQuery<Team[]>("all")
-  const usersQuery = useUsersQuery<UserOption[]>("meeting")
+  const usersQuery = useUsersQuery<UserOption[]>("team")
   const rolesQuery = useRolesQuery<RoleOption[]>()
   const teams = teamsQuery.data || []
   const users = usersQuery.data || []
@@ -78,6 +78,7 @@ export default function Teams() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
   const [form, setForm] = useState(emptyForm)
+  const dialogContentRef = useRef<HTMLDivElement>(null)
 
   const load = async () => {
     await Promise.all([teamsQuery.refetch(), usersQuery.refetch(), rolesQuery.refetch()])
@@ -121,7 +122,12 @@ export default function Teams() {
 
   const save = async () => {
     if (!form.name.trim()) {
-      Swal.fire("Team name required", "Please enter a team name.", "warning")
+      await Swal.fire({
+        target: dialogContentRef.current || document.body,
+        title: "Team name required",
+        text: "Please enter a team name.",
+        icon: "warning",
+      })
       return
     }
     try {
@@ -145,7 +151,12 @@ export default function Teams() {
         showConfirmButton: false,
       })
     } catch (error: any) {
-      Swal.fire("Unable to save team", error.response?.data?.message || "Server error occurred", "error")
+      await Swal.fire({
+        target: dialogContentRef.current || document.body,
+        title: "Unable to save team",
+        text: error.response?.data?.message || "Server error occurred",
+        icon: "error",
+      })
     } finally {
       setIsSaving(false)
     }
@@ -181,7 +192,7 @@ export default function Teams() {
               <Plus className="h-4 w-4" /> Create Team
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogContent ref={dialogContentRef} className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
             <DialogHeader>
               <DialogTitle>{editingTeam ? "Edit Team" : "Create Team"}</DialogTitle>
               <DialogDescription>

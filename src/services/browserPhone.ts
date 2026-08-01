@@ -167,7 +167,14 @@ export const browserPhone = {
       if (!placed) throw new Error("Plivo could not start the browser call")
     } catch (error) {
       stopStatusPolling()
-      const message = error instanceof Error ? error.message : typeof error === "object" ? JSON.stringify(error) : "Browser call failed"
+      const responseMessage = typeof error === "object" && error !== null && "response" in error
+        ? (error as { response?: { data?: { message?: unknown } } }).response?.data?.message
+        : undefined
+      const message = typeof responseMessage === "string"
+        ? responseMessage
+        : error instanceof Error
+          ? error.message
+          : "Call could not be started. Please try again."
       publish({ status: "error", message })
       throw error
     }

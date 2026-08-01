@@ -27,7 +27,8 @@ export const prefetchPageData = (url: string) => {
   }
   if (url === "/teams" || url === "/template-access" || url === "/users") {
     void queryClient.prefetchQuery(teamsQueryOptions(url === "/teams" ? "all" : "active"))
-    void queryClient.prefetchQuery(usersQueryOptions(url === "/users" ? "manager" : "meeting"))
+    const userPurpose = url === "/teams" ? "team" : url === "/users" ? "manager" : "meeting"
+    void queryClient.prefetchQuery(usersQueryOptions(userPurpose))
   }
   if (url === "/settings") {
     void queryClient.prefetchQuery(settingsQueryOptions())
