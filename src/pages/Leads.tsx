@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react"
-import { useNavigate } from "@tanstack/react-router"
+import { useNavigate, useSearch } from "@tanstack/react-router"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Button } from "@/components/ui/button"
 import { Plus, Users, ThumbsUp, ThumbsDown, Target, CalendarDays, Handshake, CheckCircle2, Loader2 } from "lucide-react"
@@ -15,9 +15,10 @@ import { can } from "@/lib/accessControl"
 
 export default function Leads() {
   const navigate = useNavigate()
+  const searchParams = useSearch({ strict: false }) as { status?: string }
   const currentUser = useSelector((state: RootState) => state.auth.user)
   const [statsPeriod, setStatsPeriod] = useState("all")
-  const [listStatus, setListStatus] = useState("all")
+  const [listStatus, setListStatus] = useState(searchParams.status || "all")
   const today = new Date().toISOString().split("T")[0]
   const currentMonth = today.slice(0, 7)
   const currentYear = new Date().getFullYear().toString()
@@ -61,6 +62,15 @@ export default function Leads() {
       toast.error(requestError.response?.data?.message || "Failed to fetch lead stats")
     }
   }, [error])
+
+  useEffect(() => {
+    setListStatus(searchParams.status || "all")
+    if (searchParams.status) {
+      requestAnimationFrame(() => {
+        leadsTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+      })
+    }
+  }, [searchParams.status])
 
   const commitYear = () => {
     if (/^\d{4}$/.test(yearInput) && Number(yearInput) >= 1900 && Number(yearInput) <= 2100) {

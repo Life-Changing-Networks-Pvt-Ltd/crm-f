@@ -86,6 +86,12 @@ export default function CreateCompany() {
     followType: '',
     leadStatus: 'New'
   })
+  const [demoDetails, setDemoDetails] = useState({
+    demoDateTime: '',
+    demoMode: 'Online',
+    meetingLink: '',
+    location: '',
+  })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -101,10 +107,30 @@ export default function CreateCompany() {
       toast.error("Please fill all required fields (*)")
       return
     }
+    if (formData.leadStatus === "Demo Scheduled") {
+      if (!demoDetails.demoDateTime) {
+        toast.error("Please select the demo date and time")
+        return
+      }
+      if (demoDetails.demoMode === "Online" && !demoDetails.meetingLink.trim()) {
+        toast.error("Please enter the meeting link")
+        return
+      }
+      if (demoDetails.demoMode === "On-site" && !demoDetails.location.trim()) {
+        toast.error("Please enter the demo location")
+        return
+      }
+    }
 
     try {
       setSubmitting(true)
-      await api.post('/companies', formData)
+      await api.post('/companies', formData.leadStatus === "Demo Scheduled"
+        ? {
+            ...formData,
+            scheduledDateTime: demoDetails.demoDateTime,
+            statusDetails: demoDetails,
+          }
+        : formData)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
         queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
@@ -390,6 +416,56 @@ export default function CreateCompany() {
                 </SelectContent>
               </Select>
             </div>
+            {formData.leadStatus === "Demo Scheduled" && (
+              <div className="col-span-full grid grid-cols-1 gap-6 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="demoDateTime">Demo Date &amp; Time *</Label>
+                  <Input
+                    id="demoDateTime"
+                    type="datetime-local"
+                    value={demoDetails.demoDateTime}
+                    onChange={(event) => setDemoDetails((current) => ({ ...current, demoDateTime: event.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="demoMode">Demo Mode *</Label>
+                  <Select
+                    value={demoDetails.demoMode}
+                    onValueChange={(demoMode) => setDemoDetails((current) => ({ ...current, demoMode }))}
+                  >
+                    <SelectTrigger id="demoMode" className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Online">Online</SelectItem>
+                      <SelectItem value="On-site">On-site</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {demoDetails.demoMode === "Online" ? (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="meetingLink">Meeting Link *</Label>
+                    <Input
+                      id="meetingLink"
+                      type="url"
+                      value={demoDetails.meetingLink}
+                      onChange={(event) => setDemoDetails((current) => ({ ...current, meetingLink: event.target.value }))}
+                      placeholder="https://..."
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="demoLocation">Location *</Label>
+                    <Input
+                      id="demoLocation"
+                      value={demoDetails.location}
+                      onChange={(event) => setDemoDetails((current) => ({ ...current, location: event.target.value }))}
+                      placeholder="Meeting location"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 

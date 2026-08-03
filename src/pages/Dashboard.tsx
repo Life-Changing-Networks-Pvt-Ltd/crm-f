@@ -152,7 +152,7 @@ export default function Dashboard() {
           <Card 
             key={idx} 
             className={`shadow-sm border-2 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg ${metric.color}`}
-            onClick={() => navigate({ to: '/leads/all', search: { status: metric.status } })}
+            onClick={() => navigate({ to: '/leads', search: { status: metric.status } })}
           >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
