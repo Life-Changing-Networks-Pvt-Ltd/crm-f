@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Eye, Loader2, MessageSquare, Paperclip, X, Phone, Mail } from "lucide-react"
+import { ArrowLeft, Eye, FileText, Headphones, Loader2, MessageSquare, Paperclip, X, Phone, Mail } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import api, { BACKEND_URL } from "@/services/api"
 import { toast } from "sonner"
+import Swal from "sweetalert2"
 import { browserPhone } from "@/services/browserPhone"
 import { can } from "@/lib/accessControl"
 import { templateToHtml } from "@/features/email-marketing/pages/templateUtils"
@@ -66,6 +67,11 @@ type StatusDetailsForm = {
 }
 
 const dateInputValue = (value?: string) => value ? new Date(value).toISOString().slice(0, 10) : ""
+const formatCallDuration = (seconds = 0) => `${Math.floor(seconds / 60)}m ${seconds % 60}s`
+const hasUsableTranscript = (value: unknown) => {
+  const transcript = String(value ?? "").trim()
+  return Boolean(transcript) && !["null", "undefined", "[null]", "n/a"].includes(transcript.toLowerCase())
+}
 
 const statusDetailsForm = (status: string, details?: any): StatusDetailsForm => {
   const saved = details?.status === status ? details : {}
@@ -102,6 +108,47 @@ const followUpFormFromLead = (lead: any): FollowUpForm => ({
   followUpReminder: lead?.followUpReminder || lead?.reminderBefore || "1_hour",
 })
 
+function NotificationToggle({
+  label,
+  enabled,
+  disabled,
+  loading,
+  onClick,
+}: {
+  label: string
+  enabled: boolean
+  disabled: boolean
+  loading: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      aria-label={`${label} automatic notifications ${enabled ? "on" : "off"}`}
+      disabled={disabled}
+      onClick={onClick}
+      className="inline-flex h-10 items-center gap-2.5 rounded-md border bg-background px-3 text-sm font-medium shadow-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {loading ? (
+        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+      ) : (
+        <span
+          className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${enabled ? "bg-primary" : "bg-muted-foreground/35"}`}
+          aria-hidden="true"
+        >
+          <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-4" : "translate-x-0"}`} />
+        </span>
+      )}
+      <span>{label}</span>
+      <span className={`text-[10px] font-bold ${enabled ? "text-primary" : "text-muted-foreground"}`}>
+        {enabled ? "ON" : "OFF"}
+      </span>
+    </button>
+  )
+}
+
 export default function UnifiedLeadDetails() {
   const { type, id } = useParams({ strict: false }) as any
   const leadType = type || "Company"
@@ -134,13 +181,18 @@ export default function UnifiedLeadDetails() {
   const [users, setUsers] = useState<any[]>([])
   const [assigning, setAssigning] = useState(false)
   const [callLogs, setCallLogs] = useState<any[]>([])
+  const [loadingCallLogs, setLoadingCallLogs] = useState(false)
+  const [recordingsOpen, setRecordingsOpen] = useState(false)
+  const [selectedTranscriptCall, setSelectedTranscriptCall] = useState<any | null>(null)
   const [calling, setCalling] = useState(false)
+  const [savingNotificationChannel, setSavingNotificationChannel] = useState<"email" | "whatsapp" | null>(null)
   const activityContainerRef = useRef<HTMLDivElement>(null)
   const canCallLeads = can(currentUser, "calls.manage")
   const canViewCalls = can(currentUser, "calls.view")
   const canChangeLeadStatus = can(currentUser, "leads.change_status")
   const canAssignLeads = can(currentUser, "leads.assign")
   const canAddLeadNotes = can(currentUser, "leads.add_note")
+  const canManageLeadNotifications = can(currentUser, "leads.manage_notifications")
 
   const getAttachmentUrl = (url: string) => {
     if (!url) return ""
@@ -212,12 +264,20 @@ export default function UnifiedLeadDetails() {
 
   const fetchCallLogs = async () => {
     try {
+      setLoadingCallLogs(true)
       const res = await api.get(`/leads/unified/${leadType}/${id}/calls`)
       const calls = res.data.data || []
       setCallLogs(calls)
     } catch (err) {
       console.error("Failed to fetch call logs", err)
+    } finally {
+      setLoadingCallLogs(false)
     }
+  }
+
+  const openRecordings = () => {
+    setRecordingsOpen(true)
+    void fetchCallLogs()
   }
 
   const handleClickToCall = async () => {
@@ -236,6 +296,51 @@ export default function UnifiedLeadDetails() {
     setSelectedStatus(newStatus)
     setStatusDetails(statusDetailsForm(newStatus, lead?.statusDetails))
     setFollowUpForm((current) => ({ ...current, followUpRequired: newStatus === "Follow Up" }))
+  }
+
+  const handleNotificationToggle = async (channel: "email" | "whatsapp") => {
+    const field = channel === "email" ? "emailEnabled" : "whatsappEnabled"
+    const currentlyEnabled = lead?.notificationPreferences?.[field] === true
+    const enabled = !currentlyEnabled
+
+    if (enabled) {
+      const isEmail = channel === "email"
+      const result = await Swal.fire({
+        title: isEmail
+          ? "Enable Automatic Email Notifications?"
+          : "Enable Automatic WhatsApp Notifications?",
+        text: isEmail
+          ? "Would you like to enable automatic email notifications for this lead? Once enabled, an email will be sent to the lead whenever their status is updated. Enabling this option will not send an email immediately."
+          : "Would you like to enable automatic WhatsApp notifications for this lead? Once enabled, a WhatsApp message will be sent to the lead whenever their status is updated. Enabling this option will not send a WhatsApp message immediately.",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonColor: "#cb7c15",
+        cancelButtonColor: "#64748b",
+        confirmButtonText: isEmail ? "Yes, Enable Email" : "Yes, Enable WhatsApp",
+        cancelButtonText: "Cancel",
+      })
+      if (!result.isConfirmed) return
+    }
+
+    try {
+      setSavingNotificationChannel(channel)
+      const response = await api.patch(`/leads/unified/${leadType}/${id}/notification-preferences`, {
+        channel,
+        enabled,
+      })
+      setLead((current: any) => ({
+        ...current,
+        notificationPreferences: response.data.data?.notificationPreferences || {
+          ...current?.notificationPreferences,
+          [field]: enabled,
+        },
+      }))
+      toast.success(`${channel === "email" ? "Email" : "WhatsApp"} notifications ${enabled ? "enabled" : "disabled"}`)
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Notification preference could not be updated")
+    } finally {
+      setSavingNotificationChannel(null)
+    }
   }
 
   const openMessageComposer = async (channel: "email" | "whatsapp") => {
@@ -646,12 +751,32 @@ export default function UnifiedLeadDetails() {
               <CardTitle className="text-xs uppercase tracking-wider text-muted-foreground">Actions</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-5 p-4 text-sm md:p-5">
-              {canCallLeads && (
-                <Button className="w-fit gap-2 px-5" onClick={handleClickToCall} disabled={calling}>
-                  {calling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4" />}
-                  Click to Call
-                </Button>
-              )}
+              <div className="flex flex-wrap items-center gap-3">
+                {canCallLeads && (
+                  <Button className="w-fit gap-2 px-5" onClick={handleClickToCall} disabled={calling}>
+                    {calling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Phone className="h-4 w-4" />}
+                    Click to Call
+                  </Button>
+                )}
+                {canManageLeadNotifications && (
+                  <>
+                    <NotificationToggle
+                      label="Email"
+                      enabled={lead?.notificationPreferences?.emailEnabled === true}
+                      disabled={savingNotificationChannel !== null}
+                      loading={savingNotificationChannel === "email"}
+                      onClick={() => handleNotificationToggle("email")}
+                    />
+                    <NotificationToggle
+                      label="WhatsApp"
+                      enabled={lead?.notificationPreferences?.whatsappEnabled === true}
+                      disabled={savingNotificationChannel !== null}
+                      loading={savingNotificationChannel === "whatsapp"}
+                      onClick={() => handleNotificationToggle("whatsapp")}
+                    />
+                  </>
+                )}
+              </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
@@ -853,11 +978,17 @@ export default function UnifiedLeadDetails() {
       </div>
 
       <Card className="border-muted/60 shadow-sm">
-        <CardHeader className="border-b bg-muted/10 py-3">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b bg-muted/10 py-3">
           <CardTitle className="flex items-center gap-2 text-sm">
             <MessageSquare className="h-4 w-4 text-primary" />
             Lead Activity & Notes
           </CardTitle>
+          {canViewCalls && (
+            <Button type="button" variant="outline" size="sm" onClick={openRecordings}>
+              <Headphones className="mr-2 h-4 w-4" />
+              Listen Recordings
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <div ref={activityContainerRef} className="h-[420px] overflow-y-auto bg-muted/20 p-4 md:p-5">
@@ -955,6 +1086,127 @@ export default function UnifiedLeadDetails() {
         </CardContent>
       </Card>
 
+      <Dialog
+        open={recordingsOpen}
+        onOpenChange={(open) => {
+          setRecordingsOpen(open)
+          if (!open) setSelectedTranscriptCall(null)
+        }}
+      >
+        <DialogContent className="flex max-h-[90vh] flex-col overflow-hidden p-0 sm:max-w-6xl">
+          <DialogHeader className="border-b px-6 py-5">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <Headphones className="h-5 w-5 text-primary" />
+              All Lead Recordings
+            </DialogTitle>
+            <DialogDescription>
+              Listen to every recorded call for this lead and open its complete transcript.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="overflow-auto px-6 pb-6">
+            <div className="overflow-x-auto rounded-md border">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow>
+                    <TableHead className="min-w-[170px]">Date & Time</TableHead>
+                    <TableHead className="min-w-[130px]">Called By</TableHead>
+                    <TableHead className="min-w-[145px]">From Number</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="min-w-[300px]">Recording</TableHead>
+                    <TableHead className="min-w-[150px] text-right">Transcript</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loadingCallLogs ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-40 text-center">
+                        <Loader2 className="mx-auto h-7 w-7 animate-spin text-primary" />
+                      </TableCell>
+                    </TableRow>
+                  ) : callLogs.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                        No call recordings are available for this lead.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    callLogs.map((call) => (
+                      <TableRow key={call._id}>
+                        <TableCell>{new Date(call.callDatetime || call.createdAt).toLocaleString()}</TableCell>
+                        <TableCell className="font-medium">{call.calledBy?.name || "User"}</TableCell>
+                        <TableCell className="font-medium">{call.fromNumber || "—"}</TableCell>
+                        <TableCell>{formatCallDuration(call.durationSeconds || 0)}</TableCell>
+                        <TableCell>
+                          <Badge variant={call.status === "completed" ? "default" : call.status === "failed" ? "destructive" : "secondary"} className="capitalize">
+                            {call.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {call.recordingUrl ? (
+                            <audio src={getAttachmentUrl(call.recordingUrl)} controls preload="none" className="h-10 w-full min-w-[280px]" />
+                          ) : (
+                            <span className="text-sm text-muted-foreground">
+                              {call.recordingStatus === "failed" ? "Recording unavailable" : "Recording processing"}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex flex-col items-end gap-2">
+                            <Badge variant="outline" className="capitalize">
+                              {call.transcriptionStatus || "pending"}
+                            </Badge>
+                            <Button type="button" variant="outline" size="sm" onClick={() => setSelectedTranscriptCall(call)}>
+                              <FileText className="mr-2 h-4 w-4" />
+                              View Transcript
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={Boolean(selectedTranscriptCall)} onOpenChange={(open) => !open && setSelectedTranscriptCall(null)}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Call Transcript
+            </DialogTitle>
+            <DialogDescription>
+              {selectedTranscriptCall
+                ? `${new Date(selectedTranscriptCall.callDatetime || selectedTranscriptCall.createdAt).toLocaleString()} · ${selectedTranscriptCall.calledBy?.name || "User"} · ${formatCallDuration(selectedTranscriptCall.durationSeconds || 0)}`
+                : "Complete call conversation"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedTranscriptCall && (
+            hasUsableTranscript(selectedTranscriptCall.transcriptText) ? (
+              <div className="whitespace-pre-wrap rounded-lg bg-muted/40 p-5 text-sm leading-7">
+                {selectedTranscriptCall.transcriptText}
+              </div>
+            ) : selectedTranscriptCall.transcriptionStatus === "failed" ? (
+              <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+                Transcription failed: {selectedTranscriptCall.transcriptionError || "The recording could not be transcribed."}
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
+                {selectedTranscriptCall.recordingStatus === "ready"
+                  ? "Sellerslogin is generating the transcript. Please check again shortly."
+                  : "Transcript will be generated after the recording is ready."}
+              </div>
+            )
+          )}
+        </DialogContent>
+      </Dialog>
+
       {canViewCalls && (
       <Card className="mt-4 border-muted/60 shadow-sm">
         <CardHeader className="border-b bg-muted/10 py-3">
@@ -969,6 +1221,7 @@ export default function UnifiedLeadDetails() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Called By</TableHead>
+                  <TableHead>From Number</TableHead>
                   <TableHead>Date & Time</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Status</TableHead>
@@ -979,7 +1232,7 @@ export default function UnifiedLeadDetails() {
               <TableBody>
                 {callLogs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                       No calls logged yet.
                     </TableCell>
                   </TableRow>
@@ -987,6 +1240,7 @@ export default function UnifiedLeadDetails() {
                   callLogs.map((call) => (
                     <TableRow key={call._id}>
                       <TableCell className="font-medium">{call.calledBy?.name || "User"}</TableCell>
+                      <TableCell className="font-medium">{call.fromNumber || "—"}</TableCell>
                       <TableCell>{new Date(call.callDatetime || call.createdAt).toLocaleString()}</TableCell>
                       <TableCell>{call.durationSeconds || 0}s</TableCell>
                       <TableCell>

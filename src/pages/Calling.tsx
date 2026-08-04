@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react"
+import { useSelector } from "react-redux"
 import { Check, ChevronDown, Loader2, Phone, Search, ShoppingCart } from "lucide-react"
+import type { RootState } from "@/store"
 import { PageHeader } from "@/components/layout/PageHeader"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -13,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import api from "@/services/api"
 import { toast } from "sonner"
 import Swal from "sweetalert2"
+import { isAdmin } from "@/lib/accessControl"
 
 type PlivoNumber = {
   number: string
@@ -61,9 +65,13 @@ const countryCurrencies: Record<string, string> = {
 }
 
 export default function Calling() {
+  const currentUser = useSelector((state: RootState) => state.auth.user)
+  const adminUser = isAdmin(currentUser)
   const [owned, setOwned] = useState<PlivoNumber[]>([])
   const [available, setAvailable] = useState<PlivoNumber[]>([])
-  const [selected, setSelected] = useState("")
+  const [activeNumbers, setActiveNumbers] = useState<string[]>([])
+  const [savedActiveNumbers, setSavedActiveNumbers] = useState<string[]>([])
+  const [savingPool, setSavingPool] = useState(false)
   const [country, setCountry] = useState("US")
   const [countrySearch, setCountrySearch] = useState("")
   const [type, setType] = useState("local")
@@ -81,7 +89,10 @@ export default function Calling() {
     try {
       const response = await api.get("/telephony/numbers")
       setOwned(response.data.data.numbers || [])
-      setSelected(response.data.data.selectedNumber || "")
+      const configuredNumbers = response.data.data.activeNumbers
+        || (response.data.data.selectedNumber ? [response.data.data.selectedNumber] : [])
+      setActiveNumbers(configuredNumbers)
+      setSavedActiveNumbers(configuredNumbers)
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Unable to connect to Plivo")
     } finally {
@@ -133,17 +144,41 @@ export default function Calling() {
     } finally { setBusyNumber("") }
   }
 
-  const makeDefault = async (number: string) => {
-    try {
-      setBusyNumber(number)
-      const normalized = displayNumber(number)
-      await api.put("/telephony/numbers/default", { number: normalized })
-      setSelected(normalized)
-      toast.success("Default caller ID updated")
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || "Could not select number")
-    } finally { setBusyNumber("") }
+  const toggleActiveNumber = (number: string) => {
+    const normalized = displayNumber(number)
+    setActiveNumbers((current) => current.includes(normalized)
+      ? current.filter((item) => item !== normalized)
+      : [...current, normalized])
   }
+
+  const saveActivePool = async () => {
+    if (activeNumbers.length === 0) {
+      const confirmation = await Swal.fire({
+        title: "Disable all calling numbers?",
+        text: "New CRM calls will stop until an administrator activates at least one number. Existing call history and recordings will remain available.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: "Yes, Disable All",
+        cancelButtonText: "Cancel",
+        confirmButtonColor: "#d33",
+      })
+      if (!confirmation.isConfirmed) return
+    }
+    try {
+      setSavingPool(true)
+      const response = await api.put("/telephony/numbers/active-pool", { numbers: activeNumbers })
+      const saved = response.data.data.activeNumbers || []
+      setActiveNumbers(saved)
+      setSavedActiveNumbers(saved)
+      toast.success("Active calling pool updated")
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not update the active calling pool")
+    } finally {
+      setSavingPool(false)
+    }
+  }
+
+  const poolChanged = [...activeNumbers].sort().join("|") !== [...savedActiveNumbers].sort().join("|")
 
   const formatLocalPrice = (usdValue?: string) => {
     const usd = Number(usdValue)
@@ -158,22 +193,45 @@ export default function Calling() {
       <Alert>
         <Phone className="h-4 w-4" />
         <AlertTitle>How click-to-call works</AlertTitle>
-        <AlertDescription>Clicking Call on a lead first rings the phone saved on your user profile. Answer it, and Plivo connects the lead while showing the selected virtual number as caller ID.</AlertDescription>
+        <AlertDescription>Each CRM call automatically uses the next number from the administrator-selected Active Calling Pool. Browser calls connect the employee directly to the lead.</AlertDescription>
       </Alert>
 
       <Card>
-        <CardHeader><CardTitle>Your virtual numbers</CardTitle><CardDescription>Select the caller ID used for all CRM calls.</CardDescription></CardHeader>
+        <CardHeader className="gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <CardTitle>Your virtual numbers</CardTitle>
+            <CardDescription>{adminUser ? "Select one or more numbers for the Active Calling Pool." : "Numbers currently enabled by your administrator for CRM calls."}</CardDescription>
+          </div>
+          {adminUser && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">{activeNumbers.length} selected</Badge>
+              <Button variant="outline" size="sm" onClick={() => setActiveNumbers(owned.map((item) => displayNumber(item.number)))} disabled={owned.length === 0}>Select All</Button>
+              <Button variant="outline" size="sm" onClick={() => setActiveNumbers([])} disabled={activeNumbers.length === 0}>Clear</Button>
+              <Button size="sm" onClick={saveActivePool} disabled={!poolChanged || savingPool}>
+                {savingPool && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Active Pool
+              </Button>
+            </div>
+          )}
+        </CardHeader>
         <CardContent>
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : owned.length === 0 ? (
             <p className="text-sm text-muted-foreground">No Plivo numbers purchased yet. Search below to buy one.</p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {owned.map((item) => {
-                const active = displayNumber(item.number) === selected
-                return <div key={item.number} className={`rounded-lg border p-4 ${active ? "border-primary bg-primary/5" : ""}`}>
-                  <div className="flex items-center justify-between gap-2"><span className="font-semibold">{displayNumber(item.number)}</span>{active && <Badge><Check className="mr-1 h-3 w-3" />Default</Badge>}</div>
+                const number = displayNumber(item.number)
+                const selectedForPool = activeNumbers.includes(number)
+                const currentlyActive = savedActiveNumbers.includes(number)
+                return <div key={item.number} className={`rounded-lg border p-4 ${selectedForPool ? "border-primary bg-primary/5" : ""}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {adminUser && <Checkbox checked={selectedForPool} onCheckedChange={() => toggleActiveNumber(number)} aria-label={`Use ${number} in the active calling pool`} />}
+                      <span className="truncate font-semibold">{number}</span>
+                    </div>
+                    {currentlyActive && <Badge><Check className="mr-1 h-3 w-3" />Active</Badge>}
+                  </div>
                   <p className="mt-1 text-xs text-muted-foreground">{item.country_iso || ""} {item.type ? `· ${item.type}` : ""}</p>
-                  {!active && <Button className="mt-3" size="sm" variant="outline" disabled={busyNumber === item.number} onClick={() => makeDefault(item.number)}>Use for calls</Button>}
                 </div>
               })}
             </div>
@@ -181,8 +239,8 @@ export default function Calling() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle>Buy a virtual number</CardTitle><CardDescription>Availability, pricing, and compliance are returned by your Plivo account.</CardDescription></CardHeader>
+      {adminUser && <Card>
+        <CardHeader><CardTitle>Buy a virtual number</CardTitle><CardDescription>Availability, pricing, and compliance are returned by your Sellerslogin account.</CardDescription></CardHeader>
         <CardContent className="space-y-5">
           <div className="grid items-start gap-4 md:grid-cols-4">
             <div className="space-y-2">
@@ -215,7 +273,7 @@ export default function Calling() {
           </div>
           {available.length > 0 && <div className="space-y-3"><div className="flex items-center justify-between gap-3 text-xs text-muted-foreground"><p>Local-currency amounts are live estimates. Plivo bills your account in USD.</p><p className="shrink-0">Showing {available.length}{searchMeta?.total_count ? ` of ${searchMeta.total_count}` : ""}</p></div><div className="rounded-md border"><Table><TableHeader><TableRow><TableHead>Number</TableHead><TableHead>Country</TableHead><TableHead>Type</TableHead><TableHead>Monthly rental</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader><TableBody>{available.map((item) => <TableRow key={item.number}><TableCell className="font-medium">{displayNumber(item.number)}</TableCell><TableCell>{item.country_iso || country}</TableCell><TableCell className="capitalize">{item.type || type}</TableCell><TableCell><div className="font-medium">{formatLocalPrice(item.monthly_rental_rate)}</div>{pricing.displayCurrency !== "USD" && <div className="text-xs text-muted-foreground">${Number(item.monthly_rental_rate || 0).toFixed(2)} USD</div>}</TableCell><TableCell className="text-right"><Button size="sm" onClick={() => buy(item.number)} disabled={busyNumber === item.number}>{busyNumber === item.number ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShoppingCart className="mr-2 h-4 w-4" />}Buy</Button></TableCell></TableRow>)}</TableBody></Table></div>{searchMeta?.next && <div className="flex justify-center"><Button variant="outline" onClick={() => search(true)} disabled={loadingMore}>{loadingMore && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Load more numbers</Button></div>}</div>}
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   )
 }

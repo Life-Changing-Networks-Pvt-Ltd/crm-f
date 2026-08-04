@@ -15,7 +15,7 @@ import { DataPagination } from "@/components/shared/DataPagination"
 import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
 import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import api from "@/services/api"
-import { BriefcaseBusiness, Eye, Loader2, Pencil, Plus, Trash2, UserRound } from "lucide-react"
+import { BellRing, BriefcaseBusiness, Eye, Loader2, Pencil, Plus, Trash2, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import Swal from "sweetalert2"
 import { can } from "@/lib/accessControl"
@@ -24,8 +24,13 @@ export default function Employees() {
   const navigate = useNavigate()
   const { user: currentUser } = useSelector((state: RootState) => state.auth)
   const canManageEmployees = can(currentUser, "employees.manage")
+  const canDelegateLeadNotifications = can(currentUser, "leads.manage_notifications")
   const [selectedEmployee, setSelectedEmployee] = useState<any | null>(null)
   const [isViewOpen, setIsViewOpen] = useState(false)
+  const [isNotificationAccessOpen, setIsNotificationAccessOpen] = useState(false)
+  const [notificationDelegates, setNotificationDelegates] = useState<any[]>([])
+  const [loadingNotificationDelegates, setLoadingNotificationDelegates] = useState(false)
+  const [savingDelegateId, setSavingDelegateId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState("")
   const debouncedSearch = useDebouncedValue(search)
@@ -78,12 +83,47 @@ export default function Employees() {
     }
   }
 
+  const openNotificationAccess = async () => {
+    setIsNotificationAccessOpen(true)
+    try {
+      setLoadingNotificationDelegates(true)
+      const response = await api.get("/users/lead-notification-delegates")
+      setNotificationDelegates(response.data.data || [])
+    } catch (err: any) {
+      setIsNotificationAccessOpen(false)
+      toast.error(err.response?.data?.message || "Failed to load notification access")
+    } finally {
+      setLoadingNotificationDelegates(false)
+    }
+  }
+
+  const updateNotificationAccess = async (delegate: any) => {
+    const enabled = !delegate.enabled
+    try {
+      setSavingDelegateId(delegate._id)
+      await api.put(`/users/${delegate._id}/lead-notification-access`, { enabled })
+      setNotificationDelegates((current) => current.map((item) => (
+        item._id === delegate._id ? { ...item, enabled } : item
+      )))
+      toast.success(`Lead notification access ${enabled ? "granted" : "revoked"}`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to update notification access")
+    } finally {
+      setSavingDelegateId(null)
+    }
+  }
+
   const uniqueDepartments = (data?.facets?.departments as string[] | undefined) || []
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Employees" description="Create, assign, and manage employee records.">
         <div className="flex items-center gap-3">
+          {canDelegateLeadNotifications && (
+            <Button variant="outline" onClick={openNotificationAccess}>
+              <BellRing className="mr-2 h-4 w-4" /> Notification Access
+            </Button>
+          )}
           <Input
             value={search}
             onChange={(event) => {
@@ -251,6 +291,60 @@ export default function Employees() {
               <div className="md:col-span-2 mt-2">
                 <Detail label="Notes" value={selectedEmployee.notes || "-"} />
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isNotificationAccessOpen} onOpenChange={setIsNotificationAccessOpen}>
+        <DialogContent className="max-h-[80vh] max-w-xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BellRing className="h-5 w-5 text-primary" />
+              Lead Notification Access
+            </DialogTitle>
+            <DialogDescription>
+              Allow team members to control automatic Email and WhatsApp notifications for individual leads.
+            </DialogDescription>
+          </DialogHeader>
+          {loadingNotificationDelegates ? (
+            <div className="flex h-32 items-center justify-center">
+              <Loader2 className="h-7 w-7 animate-spin text-primary" />
+            </div>
+          ) : notificationDelegates.length === 0 ? (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              No eligible active team members found.
+            </div>
+          ) : (
+            <div className="divide-y rounded-md border">
+              {notificationDelegates.map((delegate) => (
+                <div key={delegate._id} className="flex items-center justify-between gap-4 p-4">
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{delegate.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {delegate.role} · {delegate.email}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={delegate.enabled}
+                    aria-label={`Lead notification access for ${delegate.name}`}
+                    disabled={savingDelegateId !== null}
+                    onClick={() => updateNotificationAccess(delegate)}
+                    className="inline-flex shrink-0 items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingDelegateId === delegate._id ? (
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    ) : (
+                      <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${delegate.enabled ? "bg-primary" : "bg-muted-foreground/35"}`}>
+                        <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${delegate.enabled ? "translate-x-4" : "translate-x-0"}`} />
+                      </span>
+                    )}
+                    {delegate.enabled ? "Allowed" : "Not allowed"}
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </DialogContent>
