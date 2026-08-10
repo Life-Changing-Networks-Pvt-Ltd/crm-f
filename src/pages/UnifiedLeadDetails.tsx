@@ -601,6 +601,7 @@ export default function UnifiedLeadDetails() {
       status: item.newStatus,
       createdAt: item.changedAt || item.createdAt,
       createdBy: item.changedBy,
+      call: item.call,
     }))
     .filter((item: any) => item.text?.trim())
   const currentDetailsAlreadyRecorded = persistedStatusActivities.some((item: any) =>
@@ -1042,6 +1043,42 @@ export default function UnifiedLeadDetails() {
                               ) : (
                                 <img src={getAttachmentUrl(item.attachment.url)} alt="Activity attachment" className="max-h-48 max-w-full object-contain" />
                               )}
+                            </div>
+                          )}
+                          {item.call && (
+                            <div className="mt-3 space-y-2 border-t pt-2 border-muted/30">
+                              <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                                <Phone className="h-3 w-3" /> Call Recording & Transcript
+                              </p>
+                              {item.call.recordingUrl ? (
+                                <audio
+                                  src={getAttachmentUrl(item.call.recordingUrl)}
+                                  controls
+                                  preload="none"
+                                  className="h-8 w-full max-w-[280px]"
+                                />
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">
+                                  {item.call.recordingStatus === "failed" ? "Recording unavailable" : "Recording processing..."}
+                                </span>
+                              )}
+                              <div className="flex items-center gap-2 mt-1">
+                                {item.call.transcriptionStatus && (
+                                  <Badge variant="outline" className="text-[10px] capitalize bg-background/50">
+                                    Transcript: {item.call.transcriptionStatus}
+                                  </Badge>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 text-xs px-2 hover:bg-muted"
+                                  onClick={() => setSelectedTranscriptCall(item.call)}
+                                >
+                                  <FileText className="mr-1.5 h-3.5 w-3.5" />
+                                  View Transcript
+                                </Button>
+                              </div>
                             </div>
                           )}
                         </div>
