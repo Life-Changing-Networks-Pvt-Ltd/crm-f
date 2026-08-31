@@ -12,6 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ExcelImportModal } from "@/components/shared/ExcelImportModal"
+import {
+  WebsiteEnrichmentPreviewModal,
+  type WebsiteEnrichmentData,
+  type WebsitePreviewField,
+} from "@/components/leads/WebsiteEnrichmentPreviewModal"
 
 const COUNTRIES = [
   "India", "United States", "United Kingdom", "Canada", "Australia", 
@@ -63,6 +68,15 @@ export default function CreateCompany() {
   const queryClient = useQueryClient()
   const [submitting, setSubmitting] = useState(false)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [websiteUrl, setWebsiteUrl] = useState("")
+  const [fetchingWebsite, setFetchingWebsite] = useState(false)
+  const [websiteProgress, setWebsiteProgress] = useState("")
+  const [websitePreviewOpen, setWebsitePreviewOpen] = useState(false)
+  const [websiteResult, setWebsiteResult] = useState<{
+    data: WebsiteEnrichmentData
+    websiteUrl: string
+    source: "cache" | "website"
+  } | null>(null)
 
   // Form State
   const [formData, setFormData] = useState({
@@ -98,6 +112,60 @@ export default function CreateCompany() {
       ...prev,
       [e.target.name]: e.target.value
     }))
+  }
+
+  const handleFetchWebsite = async () => {
+    if (!websiteUrl.trim()) {
+      toast.error("Enter a website URL first")
+      return
+    }
+
+    const progressTimers: ReturnType<typeof setTimeout>[] = []
+    try {
+      setFetchingWebsite(true)
+      setWebsiteProgress("Checking cache...")
+      progressTimers.push(setTimeout(() => setWebsiteProgress("Scanning website..."), 700))
+      progressTimers.push(setTimeout(() => setWebsiteProgress("Analyzing with AI..."), 2_800))
+
+      const response = await api.post('/leads/enrich-url', { url: websiteUrl.trim() })
+      const result = response.data.data as {
+        source: "cache" | "website"
+        websiteUrl: string
+        data: WebsiteEnrichmentData
+      }
+      setWebsiteResult(result)
+      setWebsiteUrl(result.websiteUrl)
+      setWebsitePreviewOpen(true)
+      toast.success(result.source === "cache" ? "Website details Fetched Successfully" : "Website details extracted")
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to extract website details")
+    } finally {
+      progressTimers.forEach(clearTimeout)
+      setFetchingWebsite(false)
+      setWebsiteProgress("")
+    }
+  }
+
+  const applyWebsiteFields = (selectedFields: WebsitePreviewField[]) => {
+    if (!websiteResult) return
+    const selected = new Set(selectedFields)
+    const extracted = websiteResult.data
+    setFormData((current) => ({
+      ...current,
+      ...(selected.has("websiteUrl") ? { website1: websiteResult.websiteUrl } : {}),
+      ...(selected.has("companyName") ? { companyName: extracted.companyName } : {}),
+      ...(selected.has("primaryPerson") ? { customerName: extracted.primaryPerson } : {}),
+      ...(selected.has("primaryEmail") ? { email1: extracted.primaryEmail } : {}),
+      ...(selected.has("secondaryEmail") ? { email2: extracted.secondaryEmail } : {}),
+      ...(selected.has("primaryPhone") ? { mobileNo: extracted.primaryPhone } : {}),
+      ...(selected.has("alternatePhone") ? { phoneNo: extracted.alternatePhone } : {}),
+      ...(selected.has("address") ? { address1: extracted.address } : {}),
+      ...(selected.has("city") ? { city: extracted.city } : {}),
+      ...(selected.has("businessType") ? { businessType: extracted.businessType } : {}),
+      ...(selected.has("description") ? { products: extracted.description } : {}),
+    }))
+    setWebsitePreviewOpen(false)
+    toast.success("Selected fields applied to the form.")
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -214,6 +282,15 @@ export default function CreateCompany() {
         onImport={handleImport}
       />
 
+      <WebsiteEnrichmentPreviewModal
+        open={websitePreviewOpen}
+        onOpenChange={setWebsitePreviewOpen}
+        data={websiteResult?.data || null}
+        websiteUrl={websiteResult?.websiteUrl || websiteUrl}
+        source={websiteResult?.source || null}
+        onApply={applyWebsiteFields}
+      />
+
       <form onSubmit={handleSubmit} className="flex flex-col gap-6">
         
         {/* Basic Profile Section */}
@@ -227,9 +304,40 @@ export default function CreateCompany() {
             <CardDescription>Primary identification details for the organization.</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2 md:col-span-2">
+            <div className="space-y-2">
+              <Label htmlFor="websiteUrl" className="font-semibold text-foreground/80">Import From Website URL</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="websiteUrl"
+                  value={websiteUrl}
+                  onChange={(event) => setWebsiteUrl(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault()
+                      void handleFetchWebsite()
+                    }
+                  }}
+                  inputMode="url"
+                  autoCapitalize="none"
+                  className="bg-background"
+                  placeholder="https://www.example.com"
+                  disabled={fetchingWebsite}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 border-primary text-primary"
+                  disabled={fetchingWebsite}
+                  onClick={() => void handleFetchWebsite()}
+                >
+                  {fetchingWebsite && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {fetchingWebsite ? websiteProgress : "Fetch Details"}
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="companyName" className="font-semibold text-foreground/80">Company Name <span className="text-destructive">*</span></Label>
-              <Input id="companyName" name="companyName" value={formData.companyName} onChange={handleInputChange} required className="max-w-2xl bg-background" placeholder="E.g., Antigravity Technologies" />
+              <Input id="companyName" name="companyName" value={formData.companyName} onChange={handleInputChange} required className="bg-background" placeholder="E.g., Antigravity Technologies" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="customerName">Primary Contact Name</Label>
