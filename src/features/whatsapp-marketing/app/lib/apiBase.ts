@@ -64,6 +64,10 @@ export function installWhatsAppApiFetchAdapter() {
     }
 
     const headers = new Headers(init.headers || {})
+    const token = localStorage.getItem('crm_token')
+    if (token && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
     Object.entries(authHeaders).forEach(([key, value]) => {
       if (!headers.has(key)) headers.set(key, value)
     })

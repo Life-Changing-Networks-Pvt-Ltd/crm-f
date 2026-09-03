@@ -56,6 +56,9 @@ const Login = () => {
       });
 
       if (response.data.success) {
+        if (response.data.data?.token) {
+          localStorage.setItem('crm_token', response.data.data.token);
+        }
         dispatch(setCredentials(response.data.data));
         Swal.fire({
           icon: 'success',

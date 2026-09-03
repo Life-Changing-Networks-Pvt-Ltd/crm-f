@@ -43,14 +43,19 @@ function setStoredUser(user: User | null) {
 }
 
 export function getAuthHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const token = localStorage.getItem('crm_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   const user = getStoredUser();
-  if (!user) return {};
-  return {
-    "x-user-id": user.id || '',
-    "x-user-role": user.role || 'user',
-    "x-user-name": user.name || '',
-    "x-user": JSON.stringify(user),
-  };
+  if (user) {
+    headers["x-user-id"] = user.id || '';
+    headers["x-user-role"] = user.role || 'user';
+    headers["x-user-name"] = user.name || '';
+    headers["x-user"] = JSON.stringify(user);
+  }
+  return headers;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

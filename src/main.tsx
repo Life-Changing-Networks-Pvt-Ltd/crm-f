@@ -38,7 +38,11 @@ function App() {
 
   useEffect(() => {
     if (currentUserQuery.data) {
-      dispatch(setCredentials(currentUserQuery.data));
+      const currentToken = store.getState().auth?.token || localStorage.getItem('crm_token');
+      dispatch(setCredentials({
+        ...currentUserQuery.data,
+        token: currentToken || currentUserQuery.data.token,
+      }));
     }
   }, [currentUserQuery.data, dispatch]);
 

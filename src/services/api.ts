@@ -38,6 +38,16 @@ const logClientTiming = (config: object & { url?: string; method?: string }, sta
 
 api.interceptors.request.use((config) => {
   requestStartedAt.set(config, performance.now());
+  const token = store.getState().auth?.token || localStorage.getItem('crm_token');
+  if (token) {
+    if (typeof config.headers.set === 'function') {
+      if (!config.headers.get('Authorization')) {
+        config.headers.set('Authorization', `Bearer ${token}`);
+      }
+    } else if (config.headers && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
   return config;
 });
 
@@ -61,6 +71,7 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       // Dispatch logout action to clear state
       clearPersistedQueryCache();
+      localStorage.removeItem('crm_token');
       store.dispatch(logoutUser());
     }
     return Promise.reject(error);
