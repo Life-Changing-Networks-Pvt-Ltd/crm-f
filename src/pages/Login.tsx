@@ -87,11 +87,13 @@ const Login = () => {
           transition={{ duration: 0.8 }}
           className="z-10 max-w-md"
         >
-          <div className="flex items-center gap-2 mb-8">
-            <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-2xl">C</span>
-            </div>
-            <h1 className="text-3xl font-bold text-foreground tracking-tight">Nexus CRM</h1>
+          <div className="mb-10">
+            <h1 className="text-3xl font-bold text-foreground tracking-tight">
+              Online Promotion House
+            </h1>
+            <p className="mt-2 text-sm font-medium text-muted-foreground tracking-wide">
+              Brand under Life Changing Networks Pvt Ltd
+            </p>
           </div>
           <h2 className="text-4xl font-bold text-foreground mb-6 leading-tight">
             Manage your customer relationships like a pro.
@@ -132,11 +134,13 @@ const Login = () => {
         >
           <Card className="border-none shadow-none lg:shadow-xl lg:border bg-white dark:bg-card transition-all duration-300">
             <CardHeader className="space-y-1 pb-8">
-              <div className="lg:hidden flex items-center gap-2 mb-6">
-                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                  <span className="text-primary-foreground font-bold text-xl">C</span>
-                </div>
-                <h1 className="text-2xl font-bold text-foreground tracking-tight">Nexus CRM</h1>
+              <div className="lg:hidden mb-6">
+                <h1 className="text-2xl font-bold text-foreground tracking-tight">
+                  Online Promotion House
+                </h1>
+                <p className="mt-1.5 text-xs font-medium text-muted-foreground tracking-wide">
+                  Brand under Life Changing Networks Pvt Ltd
+                </p>
               </div>
               <CardTitle className="text-3xl font-bold tracking-tight">Welcome back</CardTitle>
               <CardDescription className="text-base">
