@@ -116,7 +116,6 @@ const navItems = [
 export function AppSidebar() {
   const location = useLocation()
   const { user } = useSelector((state: RootState) => state.auth)
-  const { systemName } = useSelector((state: RootState) => state.settings)
 
   const hasAccess = (url: string) => {
     if (!user) return false;
@@ -137,7 +136,7 @@ export function AppSidebar() {
             <LayoutDashboard className="h-4 w-4" />
           </div>
           <span className="truncate group-data-[collapsible=icon]:hidden">
-            {systemName || "Antigravity CRM"}
+            OPH Workplace
           </span>
         </RouterLink>
       </SidebarHeader>
