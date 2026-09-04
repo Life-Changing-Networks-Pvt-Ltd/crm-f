@@ -10,7 +10,6 @@ import {
   Calendar,
   StickyNote,
   BarChart3,
-  PieChart,
   LineChart,
   UserCircle,
   Settings,
@@ -84,9 +83,8 @@ const navItems = [
   {
     title: "Reports",
     items: [
-      { title: "Dashboard Reports", url: "/reports/dashboard", icon: BarChart3 },
+      { title: "Business Overview", url: "/reports/dashboard", icon: BarChart3 },
       { title: "Sales Reports", url: "/reports/sales", icon: LineChart },
-      { title: "Marketing Reports", url: "/reports/marketing", icon: PieChart },
       { title: "User Reports", url: "/reports/users", icon: Users },
       { title: "Meeting Reports", url: "/meeting-reports", icon: FileText },
       { title: "Attendance Reports", url: "/reports/attendance", icon: FileText },

@@ -24,7 +24,6 @@ const pages = [
   { name: 'Activities', desc: 'View all activities.', type: 'list' },
   { name: 'DashboardReports', desc: 'View dashboard reports.', type: 'chart' },
   { name: 'SalesReports', desc: 'View sales reports.', type: 'chart' },
-  { name: 'MarketingReports', desc: 'View marketing reports.', type: 'chart' },
   { name: 'UserReports', desc: 'View user reports.', type: 'chart' },
   { name: 'Users', desc: 'Manage system users.', type: 'list' },
   { name: 'Roles', desc: 'Manage roles and permissions.', type: 'list' },

@@ -33,7 +33,9 @@ export function Breadcrumbs() {
         {pathnames.map((value, index) => {
           const isLast = index === pathnames.length - 1
           const to = `/${pathnames.slice(0, index + 1).join("/")}`
-          const title = value.charAt(0).toUpperCase() + value.slice(1)
+          const title = to === "/reports/dashboard"
+            ? "Business Overview"
+            : value.charAt(0).toUpperCase() + value.slice(1)
 
           return (
             <div key={to} className="flex items-center">
