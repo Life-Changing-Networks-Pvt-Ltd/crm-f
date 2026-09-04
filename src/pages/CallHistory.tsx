@@ -17,11 +17,12 @@ const duration = (seconds = 0) => `${Math.floor(seconds / 60)}:${String(seconds 
 export default function CallHistory() {
   const navigate = useNavigate()
   const [status, setStatus] = useState("all")
+  const [direction, setDirection] = useState("all")
   const [fromNumber, setFromNumber] = useState("all")
   const [page, setPage] = useState(1)
   const callsQuery = useQuery<{ calls: any[]; pages: number; total: number; callingNumbers: string[] }>({
-    queryKey: ["calls", page, status, fromNumber],
-    queryFn: async () => (await api.get("/telephony/calls", { params: { page, status, fromNumber } })).data.data,
+    queryKey: ["calls", page, status, direction, fromNumber],
+    queryFn: async () => (await api.get("/telephony/calls", { params: { page, status, direction, fromNumber } })).data.data,
     staleTime: 2 * 60_000,
     gcTime: 30 * 60_000,
     placeholderData: keepPreviousData,
@@ -44,6 +45,10 @@ export default function CallHistory() {
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-muted-foreground">{total} total calls</p>
       <div className="flex flex-wrap gap-3">
+        <Select value={direction} onValueChange={(value) => { setDirection(value); setPage(1) }}>
+          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="all">All directions</SelectItem><SelectItem value="inbound">Incoming</SelectItem><SelectItem value="outbound">Outgoing</SelectItem></SelectContent>
+        </Select>
         <Select value={fromNumber} onValueChange={(value) => { setFromNumber(value); setPage(1) }}>
           <SelectTrigger className="w-52"><SelectValue placeholder="All calling numbers" /></SelectTrigger>
           <SelectContent>
@@ -69,17 +74,18 @@ export default function CallHistory() {
       <CardContent className="p-0">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Agent</TableHead><TableHead>From Number</TableHead><TableHead>Date</TableHead><TableHead>Duration</TableHead><TableHead>Status</TableHead><TableHead>Media</TableHead><TableHead className="text-right">Details</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Agent</TableHead><TableHead>Direction</TableHead><TableHead>Virtual Number</TableHead><TableHead>Date</TableHead><TableHead>Duration</TableHead><TableHead>Status</TableHead><TableHead>Media</TableHead><TableHead className="text-right">Details</TableHead></TableRow></TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={8} className="h-32 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="h-32 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></TableCell></TableRow>
               ) : calls.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">No calls found.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="h-32 text-center text-muted-foreground">No calls found.</TableCell></TableRow>
               ) : calls.map((call) => (
                 <TableRow key={call._id}>
-                  <TableCell><p className="font-medium">{leadName(call)}</p><p className="text-xs text-muted-foreground">{call.toNumber || "—"}</p></TableCell>
+                  <TableCell><p className="font-medium">{leadName(call)}</p><p className="text-xs text-muted-foreground">{call.customerNumber || (call.direction === "inbound" ? call.fromNumber : call.toNumber) || "—"}</p></TableCell>
                   <TableCell>{call.calledBy?.name || "—"}</TableCell>
-                  <TableCell className="font-medium">{call.fromNumber || "—"}</TableCell>
+                  <TableCell><Badge variant="outline">{call.direction === "inbound" ? "Incoming" : "Outgoing"}</Badge></TableCell>
+                  <TableCell className="font-medium">{call.virtualNumber || (call.direction === "inbound" ? call.toNumber : call.fromNumber) || "—"}</TableCell>
                   <TableCell>{new Date(call.callDatetime).toLocaleString()}</TableCell>
                   <TableCell><span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{duration(call.durationSeconds)}</span></TableCell>
                   <TableCell><Badge variant={call.status === "completed" ? "default" : call.status === "failed" ? "destructive" : "secondary"} className="capitalize">{call.status}</Badge></TableCell>

@@ -9,7 +9,7 @@ import { useDashboardMetrics } from "@/hooks/useDashboardMetrics"
 
 export default function Dashboard() {
   const todayStr = new Date().toISOString().split('T')[0]
-  const [statsPeriod, setStatsPeriod] = useState("all")
+  const [statsPeriod, setStatsPeriod] = useState("today")
   const [selectedMonth, setSelectedMonth] = useState(todayStr.slice(0, 7))
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
   const [yearInput, setYearInput] = useState(selectedYear)

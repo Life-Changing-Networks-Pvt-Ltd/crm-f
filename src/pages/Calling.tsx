@@ -71,7 +71,9 @@ export default function Calling() {
   const [available, setAvailable] = useState<PlivoNumber[]>([])
   const [activeNumbers, setActiveNumbers] = useState<string[]>([])
   const [savedActiveNumbers, setSavedActiveNumbers] = useState<string[]>([])
+  const [inboundReadyNumbers, setInboundReadyNumbers] = useState<string[]>([])
   const [savingPool, setSavingPool] = useState(false)
+  const [configuringCallbacks, setConfiguringCallbacks] = useState(false)
   const [country, setCountry] = useState("US")
   const [countrySearch, setCountrySearch] = useState("")
   const [type, setType] = useState("local")
@@ -93,6 +95,7 @@ export default function Calling() {
         || (response.data.data.selectedNumber ? [response.data.data.selectedNumber] : [])
       setActiveNumbers(configuredNumbers)
       setSavedActiveNumbers(configuredNumbers)
+      setInboundReadyNumbers(response.data.data.inboundReadyNumbers || [])
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Unable to connect to Plivo")
     } finally {
@@ -170,6 +173,7 @@ export default function Calling() {
       const saved = response.data.data.activeNumbers || []
       setActiveNumbers(saved)
       setSavedActiveNumbers(saved)
+      setInboundReadyNumbers(response.data.data.inboundReadyNumbers || [])
       toast.success("Active calling pool updated")
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Could not update the active calling pool")
@@ -178,7 +182,21 @@ export default function Calling() {
     }
   }
 
+  const configureCallbacks = async () => {
+    try {
+      setConfiguringCallbacks(true)
+      const response = await api.post("/telephony/numbers/configure-callbacks")
+      setInboundReadyNumbers(response.data.data.inboundReadyNumbers || [])
+      toast.success("Incoming customer callbacks enabled")
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || "Could not enable incoming callbacks")
+    } finally {
+      setConfiguringCallbacks(false)
+    }
+  }
+
   const poolChanged = [...activeNumbers].sort().join("|") !== [...savedActiveNumbers].sort().join("|")
+  const callbacksReady = savedActiveNumbers.length > 0 && savedActiveNumbers.every((number) => inboundReadyNumbers.includes(number))
 
   const formatLocalPrice = (usdValue?: string) => {
     const usd = Number(usdValue)
@@ -193,7 +211,7 @@ export default function Calling() {
       <Alert>
         <Phone className="h-4 w-4" />
         <AlertTitle>How click-to-call works</AlertTitle>
-        <AlertDescription>Each CRM call automatically uses the next number from the administrator-selected Active Calling Pool. Browser calls connect the employee directly to the lead.</AlertDescription>
+        <AlertDescription>Each CRM call automatically uses the next number from the administrator-selected Active Calling Pool. Customer callbacks return only to the last employee who called from that same number.</AlertDescription>
       </Alert>
 
       <Card>
@@ -211,6 +229,7 @@ export default function Calling() {
                 {savingPool && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Active Pool
               </Button>
+              {!callbacksReady && savedActiveNumbers.length > 0 && <Button size="sm" variant="secondary" onClick={configureCallbacks} disabled={configuringCallbacks}>{configuringCallbacks && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Enable Callbacks</Button>}
             </div>
           )}
         </CardHeader>

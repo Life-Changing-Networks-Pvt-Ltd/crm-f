@@ -13,13 +13,24 @@ import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { can } from "@/lib/accessControl"
 
+const indiaDateInputValue = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date())
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]))
+  return `${values.year}-${values.month}-${values.day}`
+}
+
 export default function Leads() {
   const navigate = useNavigate()
   const searchParams = useSearch({ strict: false }) as { status?: string }
   const currentUser = useSelector((state: RootState) => state.auth.user)
-  const [statsPeriod, setStatsPeriod] = useState("all")
+  const [statsPeriod, setStatsPeriod] = useState("today")
   const [listStatus, setListStatus] = useState(searchParams.status || "all")
-  const today = new Date().toISOString().split("T")[0]
+  const today = indiaDateInputValue()
   const currentMonth = today.slice(0, 7)
   const currentYear = new Date().getFullYear().toString()
   const [dateRange, setDateRange] = useState({ startDate: today, endDate: today })
@@ -82,13 +93,13 @@ export default function Leads() {
 
   const stats = [
     { title: "Total Company Leads", value: apiStats.totalLeads, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { title: "Demo Scheduled", value: apiStats.demoScheduled, icon: CalendarDays, color: "text-cyan-500", bg: "bg-cyan-500/10", status: "Demo Scheduled" },
-    { title: "Interested", value: apiStats.interested, icon: ThumbsUp, color: "text-emerald-500", bg: "bg-emerald-500/10", status: "Interested" },
-    { title: "Not Interested", value: apiStats.notInterested, icon: ThumbsDown, color: "text-red-500", bg: "bg-red-500/10", status: "Not Interested" },
-    { title: "Prospective", value: apiStats.prospective, icon: Target, color: "text-purple-500", bg: "bg-purple-500/10", status: "Prospective" },
-    { title: "Committed", value: apiStats.committed, icon: Handshake, color: "text-orange-500", bg: "bg-orange-500/10", status: "Committed" },
-    { title: "Converted", value: apiStats.converted, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10", status: "Converted" },
     { title: "Follow Up", value: apiStats.followUp, icon: CalendarDays, color: "text-indigo-500", bg: "bg-indigo-500/10", status: "Follow Up" },
+    { title: "Demo Scheduled", value: apiStats.demoScheduled, icon: CalendarDays, color: "text-cyan-500", bg: "bg-cyan-500/10", status: "Demo Scheduled" },
+    { title: "Committed", value: apiStats.committed, icon: Handshake, color: "text-orange-500", bg: "bg-orange-500/10", status: "Committed" },
+    { title: "Interested", value: apiStats.interested, icon: ThumbsUp, color: "text-emerald-500", bg: "bg-emerald-500/10", status: "Interested" },
+    { title: "Prospective", value: apiStats.prospective, icon: Target, color: "text-purple-500", bg: "bg-purple-500/10", status: "Prospective" },
+    { title: "Converted", value: apiStats.converted, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10", status: "Converted" },
+    { title: "Not Interested", value: apiStats.notInterested, icon: ThumbsDown, color: "text-red-500", bg: "bg-red-500/10", status: "Not Interested" },
   ];
 
   const showLeadsForStatus = (status: string) => {
