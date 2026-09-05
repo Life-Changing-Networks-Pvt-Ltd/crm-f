@@ -1,6 +1,10 @@
 import { Bell, Info, CheckCircle, AlertTriangle, XCircle } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQuery } from "@tanstack/react-query"
+import { useEffect } from "react"
+import { useSelector } from "react-redux"
+import type { RootState } from "@/store"
+import { acquireRealtimeSocket, releaseRealtimeSocket } from "@/services/realtimeSocket"
 import api from "@/services/api"
 import { queryClient } from "@/lib/queryClient"
 import { crmQueryKeys, fetchNotificationSummary, type NotificationSummary } from "@/lib/crmQueries"
@@ -17,6 +21,7 @@ import { UserDropdown } from "./UserDropdown"
 
 export function AppNavbar() {
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.auth.user)
   const { data: summary = { items: [], unreadCount: 0 } } = useQuery({
     queryKey: crmQueryKeys.notificationSummary,
     queryFn: fetchNotificationSummary,
@@ -25,6 +30,17 @@ export function AppNavbar() {
 
   const unreadCount = summary.unreadCount;
   const recentNotifications = summary.items;
+
+  useEffect(() => {
+    if (!user?._id) return
+    const socket = acquireRealtimeSocket(user._id)
+    const refresh = () => { void queryClient.invalidateQueries({ queryKey: crmQueryKeys.notificationSummary }) }
+    socket.on("notification:new", refresh)
+    return () => {
+      socket.off("notification:new", refresh)
+      releaseRealtimeSocket(socket)
+    }
+  }, [user?._id])
 
   const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();

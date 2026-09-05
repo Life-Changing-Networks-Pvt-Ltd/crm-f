@@ -1,8 +1,8 @@
 import type Plivo from "plivo-browser-sdk"
 import api from "@/services/api"
 
-export type PhoneStatus = "idle" | "connecting" | "ringing" | "in-call" | "ended" | "error"
-export type PhoneState = { status: PhoneStatus; leadName: string; muted: boolean; message?: string; callLogId?: string; connectedAt?: number }
+export type PhoneStatus = "idle" | "incoming" | "connecting" | "ringing" | "in-call" | "ended" | "error"
+export type PhoneState = { status: PhoneStatus; direction?: "inbound" | "outbound"; leadName: string; callerNumber?: string; muted: boolean; message?: string; callLogId?: string; incomingCallUUID?: string; connectedAt?: number }
 
 let sdk: Plivo | null = null
 let sdkPromise: Promise<Plivo> | null = null
@@ -15,6 +15,7 @@ let callConnected = false
 let connectedAt = 0
 let statusPollTimer: number | undefined
 let suppressNextTermination = false
+let registrationPromise: Promise<void> | null = null
 
 const stopStatusPolling = () => {
   if (statusPollTimer !== undefined) window.clearInterval(statusPollTimer)
@@ -26,6 +27,28 @@ const terminalMessage = (call: { status?: string; hangupCause?: string }) => {
   if (cause.includes("busy") || cause.includes("reject")) return "Lead rejected the call or the line was busy"
   if (cause.includes("no answer") || cause.includes("timeout")) return "Lead did not answer the call"
   return "Call ended before connection"
+}
+
+const headerValue = (headers: unknown, expected: string) => {
+  if (!headers || typeof headers !== "object") return ""
+  const normalizedExpected = expected.toLowerCase().replace(/[^a-z0-9]/g, "")
+  const entry = Object.entries(headers as Record<string, unknown>)
+    .find(([key]) => key.toLowerCase().replace(/[^a-z0-9]/g, "") === normalizedExpected)
+  return entry ? String(entry[1] || "") : ""
+}
+
+const resolveIncomingDetails = async (callerNumber: string, extraHeaders: unknown) => {
+  const headerCallLogId = headerValue(extraHeaders, "X-PH-CRMCallLogId")
+  try {
+    const response = await api.get("/telephony/browser/incoming/current")
+    const call = response.data?.data?.call || response.data?.data
+    return {
+      callLogId: headerCallLogId || call?._id,
+      leadName: call?.lead?.companyName || call?.lead?.customerName || call?.lead?.name || callerNumber,
+    }
+  } catch {
+    return { callLogId: headerCallLogId || undefined, leadName: callerNumber }
+  }
 }
 
 const startStatusPolling = (callLogId: string) => {
@@ -75,7 +98,7 @@ const finalizeCall = (connected: boolean, reason: string) => {
 const publish = (patch: Partial<PhoneState>) => {
   // Plivo can emit failed/terminated events after the user has already closed
   // a terminal dialog. Do not let those stale events reopen it.
-  if (state.status === "idle" && patch.status && patch.status !== "connecting") return
+  if (state.status === "idle" && patch.status && !["connecting", "incoming"].includes(patch.status)) return
   state = { ...state, ...patch }
   listeners.forEach((listener) => listener(state))
 }
@@ -94,12 +117,36 @@ const ensureSdk = async (): Promise<Plivo> => {
   events.on("onCallConnected", () => publish({ status: "ringing", message: "Lead phone is ringing…" }))
   events.on("onCallAnswered", () => { callConnected = true; connectedAt ||= Date.now(); publish({ status: "in-call", message: "Call connected", connectedAt }) })
   events.on("onMediaConnected", () => { callConnected = true; connectedAt ||= Date.now(); publish({ status: "in-call", message: "Call connected", connectedAt }) })
+  events.on("onIncomingCall", (callerId: unknown, extraHeaders: unknown, callInfo: unknown) => {
+    if (!["idle", "ended", "error"].includes(state.status)) return
+    const info = callInfo && typeof callInfo === "object" ? callInfo as Record<string, unknown> : {}
+    const incomingCallUUID = String(info.callUUID || "")
+    const callerNumber = String(callerId || info.src || "Customer")
+    callConnected = false; connectedAt = 0; suppressNextTermination = false
+    publish({
+      status: "incoming",
+      direction: "inbound",
+      leadName: callerNumber,
+      callerNumber,
+      incomingCallUUID,
+      muted: false,
+      message: "Incoming customer callback",
+      callLogId: headerValue(extraHeaders, "X-PH-CRMCallLogId") || undefined,
+    })
+    void resolveIncomingDetails(callerNumber, extraHeaders).then((details) => {
+      if (state.status === "incoming" && state.incomingCallUUID === incomingCallUUID) publish(details)
+    })
+  })
+  events.on("onIncomingCallCanceled", () => {
+    if (state.direction !== "inbound" || state.status !== "incoming") return
+    publish({ status: "error", message: "Customer ended the call before it was answered" })
+  })
   events.on("onCallFailed", (info: unknown) => {
     stopStatusPolling()
     if (suppressNextTermination) return
     const detail = info && typeof info === "object" ? JSON.stringify(info) : String(info || "")
     const message = detail.toLowerCase().includes("busy")
-      ? "Lead rejected the call or the line was busy"
+      ? state.direction === "inbound" ? "Incoming call was declined" : "Lead rejected the call or the line was busy"
       : "Call could not be completed"
     finalizeCall(false, detail || "Call failed")
     publish({ status: "error", message })
@@ -151,7 +198,7 @@ export const browserPhone = {
   getState: () => state,
   async start(type: string, id: string, leadName: string) {
     if (!["idle", "ended", "error"].includes(state.status)) throw new Error("Another call is already active")
-    publish({ status: "connecting", leadName, muted: false, message: "Requesting microphone access…" })
+    publish({ status: "connecting", direction: "outbound", leadName, muted: false, message: "Requesting microphone access…", incomingCallUUID: undefined, callerNumber: undefined })
     callConnected = false; connectedAt = 0; suppressNextTermination = false
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
@@ -179,11 +226,44 @@ export const browserPhone = {
       throw error
     }
   },
+  async registerForIncoming() {
+    if (registrationPromise) return registrationPromise
+    registrationPromise = (async () => {
+      const response = await api.get("/telephony/browser/session")
+      const { username, password } = response.data.data
+      await login(username, password)
+    })().finally(() => { registrationPromise = null })
+    return registrationPromise
+  },
+  async answerIncoming() {
+    if (state.status !== "incoming" || !state.incomingCallUUID) return false
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach((track) => track.stop())
+      const answered = sdk?.client.answer(state.incomingCallUUID, "reject") || false
+      if (answered) publish({ status: "connecting", message: "Connecting customer call…" })
+      else publish({ status: "error", message: "Incoming call could not be answered" })
+      return answered
+    } catch {
+      publish({ status: "error", message: "Microphone permission is required to answer the call" })
+      return false
+    }
+  },
+  rejectIncoming() {
+    if (state.status !== "incoming" || !state.incomingCallUUID) return false
+    suppressNextTermination = true
+    const rejected = sdk?.client.reject(state.incomingCallUUID) || false
+    finalizeCall(false, "Employee rejected incoming callback")
+    publish({ status: "ended", message: "Incoming call declined" })
+    window.setTimeout(() => { suppressNextTermination = false }, 2000)
+    return rejected
+  },
   hangup() { sdk?.client.hangup() },
   toggleMute() {
     if (!sdk) return
     if (state.muted) sdk.client.unmute(); else sdk.client.mute()
     publish({ muted: !state.muted })
   },
-  dismiss() { if (["ended", "error"].includes(state.status)) { stopStatusPolling(); publish({ status: "idle", leadName: "", message: undefined, muted: false, callLogId: undefined, connectedAt: undefined }) } },
+  logout() { sdk?.client.logout(); loggedInUser = "" },
+  dismiss() { if (["ended", "error"].includes(state.status)) { stopStatusPolling(); publish({ status: "idle", direction: undefined, leadName: "", callerNumber: undefined, message: undefined, muted: false, callLogId: undefined, incomingCallUUID: undefined, connectedAt: undefined }) } },
 }

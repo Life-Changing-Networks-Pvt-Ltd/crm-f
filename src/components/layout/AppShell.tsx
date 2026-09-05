@@ -1,5 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from "react"
 import { Outlet } from "@tanstack/react-router"
+import { useSelector } from "react-redux"
+import type { RootState } from "@/store"
+import { can } from "@/lib/accessControl"
+import { browserPhone } from "@/services/browserPhone"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "./AppSidebar"
 import { AppNavbar } from "./AppNavbar"
@@ -16,6 +20,14 @@ const FollowUpReminderCenter = lazy(() => import("../shared/FollowUpReminderCent
 
 export function AppShell() {
   const [loadUtilities, setLoadUtilities] = useState(false)
+  const currentUser = useSelector((state: RootState) => state.auth.user)
+
+  useEffect(() => {
+    if (!can(currentUser, "calls.manage")) return
+    void browserPhone.registerForIncoming().catch(() => {
+      // Outbound calling still performs its own login and reports actionable errors.
+    })
+  }, [currentUser])
 
   useEffect(() => {
     const browser = window as typeof window & {

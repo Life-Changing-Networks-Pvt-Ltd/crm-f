@@ -27,7 +27,6 @@ const Calendar = lazyPage(() => import('../pages/Calendar'));
 const Notes = lazyPage(() => import('../pages/Notes'));
 const DashboardReports = lazyPage(() => import('../pages/DashboardReports'));
 const SalesReports = lazyPage(() => import('../pages/SalesReports'));
-const MarketingReports = lazyPage(() => import('../pages/MarketingReports'));
 const UserReports = lazyPage(() => import('../pages/UserReports'));
 const MeetingReports = lazyPage(() => import('../pages/MeetingReports'));
 const AttendanceReports = lazyPage(() => import('../pages/AttendanceReports'));
@@ -163,7 +162,6 @@ const notesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/n
 // Reports Routes
 const reportsDashboardRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/dashboard', component: DashboardReports, beforeLoad: requireGrant('reports.view') });
 const reportsSalesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/sales', component: SalesReports, beforeLoad: requireGrant('reports.view') });
-const reportsMarketingRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/marketing', component: MarketingReports, beforeLoad: requireGrant('reports.view') });
 const reportsUsersRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/users', component: UserReports, beforeLoad: requireGrant('reports.view') });
 const meetingReportsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/meeting-reports', component: MeetingReports, beforeLoad: requireGrant('reports.view') });
 const attendanceReportsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/reports/attendance', component: AttendanceReports, beforeLoad: requireGrant('reports.view') });
@@ -224,7 +222,6 @@ const routeTree = rootRoute.addChildren([
     attendanceRoute,
     reportsDashboardRoute,
     reportsSalesRoute,
-    reportsMarketingRoute,
     reportsUsersRoute,
     meetingReportsRoute,
     attendanceReportsRoute,

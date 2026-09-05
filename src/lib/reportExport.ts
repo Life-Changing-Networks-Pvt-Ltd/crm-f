@@ -1,7 +1,7 @@
 import api from "@/services/api"
 
 export async function downloadReportCsv(
-  report: "sales" | "marketing" | "users" | "meetings",
+  report: "sales" | "users" | "meetings",
   params: Record<string, string>,
 ) {
   const response = await api.get(`/reports/${report}/export`, {
