@@ -70,9 +70,9 @@ interface PerformanceData {
   pagination: PaginationMeta
 }
 
-const STATUSES = ["New", "Follow Up", "Interested", "Demo Scheduled", "Committed", "Converted", "Not Interested"]
+const STATUSES = ["New", "Follow Up", "Interested", "Demo Scheduled", "Demo follow-up", "Committed", "Converted", "Not Interested"]
 const STATUS_COLORS: Record<string, string> = {
-  New: "#3b82f6", "Follow Up": "#6366f1", Interested: "#10b981", "Demo Scheduled": "#06b6d4",
+  New: "#3b82f6", "Follow Up": "#6366f1", Interested: "#10b981", "Demo Scheduled": "#06b6d4", "Demo follow-up": "#8b5cf6",
   Committed: "#f97316", Converted: "#22c55e", "Not Interested": "#ef4444",
 }
 const todayInput = () => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" })
@@ -214,7 +214,7 @@ export default function SalesReports() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const classes: Record<string, string> = { Converted: "bg-green-100 text-green-800", Committed: "bg-orange-100 text-orange-800", Interested: "bg-emerald-100 text-emerald-800", "Not Interested": "bg-red-100 text-red-800", "Demo Scheduled": "bg-cyan-100 text-cyan-800", "Follow Up": "bg-indigo-100 text-indigo-800" }
+  const classes: Record<string, string> = { Converted: "bg-green-100 text-green-800", Committed: "bg-orange-100 text-orange-800", Interested: "bg-emerald-100 text-emerald-800", "Not Interested": "bg-red-100 text-red-800", "Demo Scheduled": "bg-cyan-100 text-cyan-800", "Demo follow-up": "bg-violet-100 text-violet-800", "Follow Up": "bg-indigo-100 text-indigo-800" }
   return <Badge className={classes[status]} variant={classes[status] ? "default" : "secondary"}>{status === "Converted" ? "Converted / Paid" : status}</Badge>
 }
 

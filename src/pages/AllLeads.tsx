@@ -186,6 +186,7 @@ export default function AllLeads() {
               <SelectItem value="Demo Scheduled">Demo Scheduled</SelectItem>
               <SelectItem value="Interested">Interested</SelectItem>
               <SelectItem value="Not Interested">Not Interested</SelectItem>
+              <SelectItem value="Demo follow-up">Demo follow-up</SelectItem>
               <SelectItem value="Follow Up">Follow Up</SelectItem>
               <SelectItem value="Committed">Committed</SelectItem>
               <SelectItem value="Converted">Converted / Paid</SelectItem>

@@ -26,17 +26,17 @@ const indiaDateInputValue = () => {
 
 export default function Leads() {
   const navigate = useNavigate()
-  const searchParams = useSearch({ strict: false }) as { status?: string }
+  const searchParams = useSearch({ strict: false }) as { status?: string; period?: string; startDate?: string; endDate?: string; month?: string; year?: string }
   const currentUser = useSelector((state: RootState) => state.auth.user)
-  const [statsPeriod, setStatsPeriod] = useState("today")
+  const [statsPeriod, setStatsPeriod] = useState(searchParams.status === "Demo follow-up" ? searchParams.period || "today" : "today")
   const [listStatus, setListStatus] = useState(searchParams.status || "all")
   const today = indiaDateInputValue()
   const currentMonth = today.slice(0, 7)
   const currentYear = new Date().getFullYear().toString()
-  const [dateRange, setDateRange] = useState({ startDate: today, endDate: today })
-  const [selectedMonth, setSelectedMonth] = useState(currentMonth)
-  const [selectedYear, setSelectedYear] = useState(currentYear)
-  const [yearInput, setYearInput] = useState(currentYear)
+  const [dateRange, setDateRange] = useState({ startDate: searchParams.status === "Demo follow-up" ? searchParams.startDate || today : today, endDate: searchParams.status === "Demo follow-up" ? searchParams.endDate || today : today })
+  const [selectedMonth, setSelectedMonth] = useState(searchParams.status === "Demo follow-up" ? searchParams.month || currentMonth : currentMonth)
+  const [selectedYear, setSelectedYear] = useState(searchParams.status === "Demo follow-up" ? searchParams.year || currentYear : currentYear)
+  const [yearInput, setYearInput] = useState(searchParams.status === "Demo follow-up" ? searchParams.year || currentYear : currentYear)
   const startDateRef = useRef<HTMLInputElement>(null)
   const endDateRef = useRef<HTMLInputElement>(null)
   const monthRef = useRef<HTMLInputElement>(null)
@@ -45,6 +45,7 @@ export default function Leads() {
   const defaultStats = {
     totalLeads: 0,
     demoScheduled: 0,
+    demoFollowUp: 0,
     interested: 0,
     notInterested: 0,
     committed: 0,
@@ -94,6 +95,7 @@ export default function Leads() {
     { title: "Total Company Leads", value: apiStats.totalLeads, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
     { title: "Follow Up", value: apiStats.followUp, icon: CalendarDays, color: "text-indigo-500", bg: "bg-indigo-500/10", status: "Follow Up" },
     { title: "Demo Scheduled", value: apiStats.demoScheduled, icon: CalendarDays, color: "text-cyan-500", bg: "bg-cyan-500/10", status: "Demo Scheduled" },
+    { title: "Demo follow-up", value: apiStats.demoFollowUp || 0, icon: CalendarDays, color: "text-violet-500", bg: "bg-violet-500/10", status: "Demo follow-up" },
     { title: "Interested", value: apiStats.interested, icon: ThumbsUp, color: "text-emerald-500", bg: "bg-emerald-500/10", status: "Interested" },
     { title: "Committed", value: apiStats.committed, icon: Handshake, color: "text-orange-500", bg: "bg-orange-500/10", status: "Committed" },
     { title: "Converted / Paid", value: apiStats.converted, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10", status: "Converted" },

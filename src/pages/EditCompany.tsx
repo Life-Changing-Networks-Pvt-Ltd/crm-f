@@ -1,3 +1,4 @@
+import { DemoFollowUpFields, localDemoFollowUpDateTime } from "@/components/leads/DemoFollowUpFields"
 import { useState, useEffect } from "react"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
@@ -49,6 +50,7 @@ const BUSINESS_TYPES = [
 const LEAD_STATUSES = [
   { value: "New", color: "bg-blue-500" },
   { value: "Demo Scheduled", color: "bg-cyan-500" },
+  { value: "Demo follow-up", color: "bg-violet-500" },
   { value: "Interested", color: "bg-emerald-500" },
   { value: "Not Interested", color: "bg-red-500" },
   { value: "Follow Up", color: "bg-yellow-500" },
@@ -63,6 +65,7 @@ export default function EditCompany() {
   const queryClient = useQueryClient()
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [demoFollowUp, setDemoFollowUp] = useState({ demoFollowUpDateTime: '', reminder: '30_minutes', note: '' })
 
   // Form State
   const [formData, setFormData] = useState({
@@ -98,6 +101,11 @@ export default function EditCompany() {
       setLoading(true)
       const res = await api.get(`/companies/${id}`)
       const data = res.data.data
+      setDemoFollowUp({
+        demoFollowUpDateTime: localDemoFollowUpDateTime(data.statusDetails?.demoFollowUpDateTime),
+        reminder: data.statusDetails?.reminder || '30_minutes',
+        note: data.statusDetails?.status === 'Demo follow-up' ? data.statusDetails.note || '' : '',
+      })
       
       // Format date for input[type="date"]
       let formattedDate = ''
@@ -149,12 +157,19 @@ export default function EditCompany() {
       return
     }
 
+    if (formData.leadStatus === "Demo follow-up" && !demoFollowUp.demoFollowUpDateTime) {
+      toast.error("Select a demo follow-up date and time")
+      return
+    }
     try {
       setSubmitting(true)
-      await api.put(`/companies/${leadId}`, formData)
+      await api.put(`/companies/${leadId}`, formData.leadStatus === "Demo follow-up"
+        ? { ...formData, statusDetails: { ...demoFollowUp, demoFollowUpDateTime: new Date(demoFollowUp.demoFollowUpDateTime).toISOString() } }
+        : formData)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
         queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
+        ...(formData.leadStatus === "Demo follow-up" ? [queryClient.invalidateQueries({ queryKey: ["dashboard", "metrics"] })] : []),
       ])
       toast.success("Company lead updated successfully")
       navigate({ to: '/leads/$id', params: { id: leadId } })
@@ -365,10 +380,12 @@ export default function EditCompany() {
               <Input id="products" name="products" value={formData.products} onChange={handleInputChange} placeholder="e.g., Software, Hardware" />
             </div>
 
+            {formData.leadStatus !== "Demo follow-up" && (
             <div className="space-y-2">
               <Label htmlFor="followTypeDate">Next Follow-up Date</Label>
               <Input id="followTypeDate" name="followTypeDate" type="date" value={formData.followTypeDate} onChange={handleInputChange} />
             </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="followType">Engagement / Follow Type</Label>
               <Select value={formData.leadStatus} onValueChange={(val) => setFormData(p => ({...p, followType: val, leadStatus: val}))}>
@@ -387,6 +404,15 @@ export default function EditCompany() {
                 </SelectContent>
               </Select>
             </div>
+            {formData.leadStatus === "Demo follow-up" && <DemoFollowUpFields
+              value={demoFollowUp.demoFollowUpDateTime}
+              onChange={(value) => setDemoFollowUp((current) => ({ ...current, demoFollowUpDateTime: value }))}
+              reminder={demoFollowUp.reminder}
+              onReminderChange={(reminder) => setDemoFollowUp((current) => ({ ...current, reminder }))}
+              note={demoFollowUp.note}
+              onNoteChange={(note) => setDemoFollowUp((current) => ({ ...current, note }))}
+              disabled={submitting}
+            />}
           </CardContent>
         </Card>
 

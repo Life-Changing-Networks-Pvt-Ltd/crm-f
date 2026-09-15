@@ -32,6 +32,7 @@ interface CompanyLead {
   leadStatus?: string
   followUpRequired?: boolean
   followUpDateTime?: string
+  statusDetails?: { demoFollowUpDateTime?: string }
   followTypeDate?: string
   scheduledDateTime?: string
   createdAt?: string
@@ -56,6 +57,7 @@ interface CompanyLeadDateFilters {
 const STATUSES = [
   { value: "New", label: "New" },
   { value: "Demo Scheduled", label: "Demo Scheduled" },
+  { value: "Demo follow-up", label: "Demo follow-up" },
   { value: "Interested", label: "Interested" },
   { value: "Not Interested", label: "Not Interested" },
   { value: "Follow Up", label: "Follow Up" },
@@ -342,7 +344,7 @@ export function CompanyLeadsTable({
                     </TableCell>
                     <TableCell className="whitespace-nowrap">{formatDateTime(company.createdAt)}</TableCell>
                     <TableCell className="whitespace-nowrap">
-                      {formatDateTime(company.followUpDateTime || company.scheduledDateTime || company.followTypeDate)}
+                      {formatDateTime(company.leadStatus === "Demo follow-up" ? company.statusDetails?.demoFollowUpDateTime : company.followUpDateTime || company.scheduledDateTime || company.followTypeDate)}
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">

@@ -5,6 +5,7 @@ export interface DashboardMetrics {
   totalCompanyLeads: number
   new: number
   demoScheduled: number
+  demoFollowUp: number
   interested: number
   notInterested: number
   committed: number

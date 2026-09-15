@@ -65,6 +65,7 @@ const SOURCE_COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f97316", "#ec4899", "#
 const PIPELINE_COLORS: Record<string, string> = {
   New: "#3b82f6",
   "Demo Scheduled": "#06b6d4",
+  "Demo follow-up": "#8b5cf6",
   Interested: "#10b981",
   Committed: "#f97316",
   Converted: "#22c55e",

@@ -1,3 +1,4 @@
+import { DemoFollowUpFields } from "@/components/leads/DemoFollowUpFields"
 import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
@@ -55,6 +56,7 @@ const BUSINESS_TYPES = [
 const LEAD_STATUSES = [
   { value: "New", color: "bg-blue-500" },
   { value: "Demo Scheduled", color: "bg-cyan-500" },
+  { value: "Demo follow-up", color: "bg-violet-500" },
   { value: "Interested", color: "bg-emerald-500" },
   { value: "Not Interested", color: "bg-red-500" },
   { value: "Follow Up", color: "bg-yellow-500" },
@@ -66,6 +68,7 @@ export default function CreateCompany() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [submitting, setSubmitting] = useState(false)
+  const [demoFollowUp, setDemoFollowUp] = useState({ demoFollowUpDateTime: '', reminder: '30_minutes', note: '' })
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [websiteUrl, setWebsiteUrl] = useState("")
   const [fetchingWebsite, setFetchingWebsite] = useState(false)
@@ -199,6 +202,10 @@ export default function CreateCompany() {
       }
     }
 
+    if (formData.leadStatus === "Demo follow-up" && !demoFollowUp.demoFollowUpDateTime) {
+      toast.error("Select a demo follow-up date and time")
+      return
+    }
     try {
       setSubmitting(true)
       await api.post('/companies', formData.leadStatus === "Demo Scheduled"
@@ -207,10 +214,13 @@ export default function CreateCompany() {
             scheduledDateTime: demoDetails.demoDateTime,
             statusDetails: demoDetails,
           }
-        : formData)
+        : formData.leadStatus === "Demo follow-up"
+          ? { ...formData, statusDetails: { ...demoFollowUp, demoFollowUpDateTime: new Date(demoFollowUp.demoFollowUpDateTime).toISOString() } }
+          : formData)
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
         queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
+        ...(formData.leadStatus === "Demo follow-up" ? [queryClient.invalidateQueries({ queryKey: ["dashboard", "metrics"] })] : []),
       ])
       toast.success("Company lead created successfully")
       navigate({ to: '/leads' })
@@ -511,10 +521,12 @@ export default function CreateCompany() {
               <Input id="products" name="products" value={formData.products} onChange={handleInputChange} placeholder="e.g., Software, Hardware" />
             </div>
 
+            {formData.leadStatus !== "Demo follow-up" && (
             <div className="space-y-2">
               <Label htmlFor="followTypeDate">Next Follow-up Date</Label>
               <Input id="followTypeDate" name="followTypeDate" type="date" value={formData.followTypeDate} onChange={handleInputChange} />
             </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="followType">Engagement / Follow Type</Label>
               <Select value={formData.leadStatus} onValueChange={(val) => setFormData(p => ({...p, followType: val, leadStatus: val}))}>
@@ -533,6 +545,15 @@ export default function CreateCompany() {
                 </SelectContent>
               </Select>
             </div>
+            {formData.leadStatus === "Demo follow-up" && <DemoFollowUpFields
+              value={demoFollowUp.demoFollowUpDateTime}
+              onChange={(value) => setDemoFollowUp((current) => ({ ...current, demoFollowUpDateTime: value }))}
+              reminder={demoFollowUp.reminder}
+              onReminderChange={(reminder) => setDemoFollowUp((current) => ({ ...current, reminder }))}
+              note={demoFollowUp.note}
+              onNoteChange={(note) => setDemoFollowUp((current) => ({ ...current, note }))}
+              disabled={submitting}
+            />}
             {formData.leadStatus === "Demo Scheduled" && (
               <div className="col-span-full grid grid-cols-1 gap-6 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4 md:grid-cols-2">
                 <div className="space-y-2">

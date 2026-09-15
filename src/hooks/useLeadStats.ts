@@ -4,6 +4,7 @@ import api from "@/services/api"
 export interface LeadStats {
   totalLeads: number
   demoScheduled: number
+  demoFollowUp: number
   interested: number
   notInterested: number
   committed: number

@@ -1,3 +1,4 @@
+import { DemoFollowUpFields } from "@/components/leads/DemoFollowUpFields"
 import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import { useParams, useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
@@ -47,6 +48,7 @@ interface FollowUpForm {
 }
 
 type StatusDetailsForm = {
+  demoFollowUpDateTime: string
   note: string
   productService: string
   expectedDecisionDate: string
@@ -76,6 +78,7 @@ const hasUsableTranscript = (value: unknown) => {
 const statusDetailsForm = (status: string, details?: any): StatusDetailsForm => {
   const saved = details?.status === status ? details : {}
   return {
+    demoFollowUpDateTime: saved.demoFollowUpDateTime ? dateTimeInputValue(new Date(saved.demoFollowUpDateTime)) : "",
     note: saved.note || "",
     productService: saved.productService || "",
     expectedDecisionDate: dateInputValue(saved.expectedDecisionDate),
@@ -210,6 +213,7 @@ export default function UnifiedLeadDetails() {
   const STATUSES = [
     { value: 'New', color: 'bg-blue-500' },
     { value: 'Demo Scheduled', color: 'bg-cyan-500' },
+    { value: 'Demo follow-up', color: 'bg-violet-500' },
     { value: 'Interested', color: 'bg-emerald-500' },
     { value: 'Not Interested', color: 'bg-red-500' },
     { value: 'Follow Up', color: 'bg-yellow-500' },
@@ -400,6 +404,10 @@ export default function UnifiedLeadDetails() {
       toast.error("Please write comment")
       return
     }
+    if (selectedStatus === "Demo follow-up" && !statusDetails.demoFollowUpDateTime) {
+      toast.error("Select a demo follow-up date and time")
+      return
+    }
     if (leadType === "Company" && selectedStatus === "Demo Scheduled" && !statusDetails.demoDateTime) {
       toast.error("Select a demo date and time")
       return
@@ -412,7 +420,7 @@ export default function UnifiedLeadDetails() {
       setSavingStatusDetails(true)
       const response = await api.put(`/leads/unified/${leadType}/${id}/status`, {
         status: selectedStatus,
-        ...(leadType === "Company" ? { details: statusDetails } : {}),
+        ...(leadType === "Company" || selectedStatus === "Demo follow-up" ? { details: selectedStatus === "Demo follow-up" ? { ...statusDetails, demoFollowUpDateTime: new Date(statusDetails.demoFollowUpDateTime).toISOString() } : statusDetails } : {}),
         comment,
       })
       const savedAt = response.data.data?.statusDetails?.savedAt || new Date().toISOString()
@@ -426,7 +434,7 @@ export default function UnifiedLeadDetails() {
         ...current,
         leadStatus: selectedStatus,
         leadStatusChangedAt: response.data.data?.leadStatusChangedAt,
-        ...(leadType === "Company" ? { statusDetails: response.data.data?.statusDetails } : {}),
+        ...(leadType === "Company" || selectedStatus === "Demo follow-up" ? { statusDetails: response.data.data?.statusDetails } : {}),
         statusHistory: [{
           oldStatus: current.leadStatus,
           newStatus: selectedStatus,
@@ -442,6 +450,7 @@ export default function UnifiedLeadDetails() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
         queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
+        ...(selectedStatus === "Demo follow-up" || lead?.leadStatus === "Demo follow-up" ? [queryClient.invalidateQueries({ queryKey: ["dashboard", "metrics"] })] : []),
       ])
       toast.success(`${selectedStatus} details saved`)
     } catch (err: any) {
@@ -734,7 +743,9 @@ export default function UnifiedLeadDetails() {
               <DetailItem label="Lead Source" value={lead.leadSource} />
               <DetailItem
                 label="Next Follow-up"
-                value={lead.followUpDateTime || lead.scheduledDateTime || lead.followTypeDate
+                value={lead.leadStatus === "Demo follow-up"
+                  ? (lead.statusDetails?.demoFollowUpDateTime ? new Date(lead.statusDetails.demoFollowUpDateTime).toLocaleString([], { hour12: true }) : "Not scheduled")
+                  : lead.followUpDateTime || lead.scheduledDateTime || lead.followTypeDate
                   ? new Date(lead.followUpDateTime || lead.scheduledDateTime || lead.followTypeDate).toLocaleString()
                   : "—"}
               />
@@ -953,7 +964,7 @@ export default function UnifiedLeadDetails() {
                   </Button>
                 </div>
               )}
-              {canChangeLeadStatus && leadType === "Company" && selectedStatus !== "Follow Up" && (
+              {canChangeLeadStatus && (leadType === "Company" || selectedStatus === "Demo follow-up") && selectedStatus !== "Follow Up" && (
                 <StatusDetailsPanel
                   status={selectedStatus}
                   details={statusDetails}
@@ -962,7 +973,7 @@ export default function UnifiedLeadDetails() {
                   onSave={handleSaveStatusDetails}
                 />
               )}
-              {canChangeLeadStatus && leadType !== "Company" && (
+              {canChangeLeadStatus && leadType !== "Company" && selectedStatus !== "Demo follow-up" && (
                 <SimpleStatusNotePanel
                   status={selectedStatus}
                   note={statusDetails.note}
@@ -1557,6 +1568,8 @@ function StatusDetailsPanel({
         <p className="text-sm font-semibold">{titles[status] || `${status} Details`}</p>
         <p className="text-xs text-muted-foreground">Save the information relevant to the selected lead status.</p>
       </div>
+
+      {status === "Demo follow-up" && <DemoFollowUpFields value={details.demoFollowUpDateTime} onChange={(value) => update("demoFollowUpDateTime", value)} reminder={details.reminder} onReminderChange={(value) => update("reminder", value)} disabled={saving} />}
 
       {status === "Demo Scheduled" && (
         <div className="grid gap-4 md:grid-cols-2">

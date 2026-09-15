@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { Loader2, ArrowRight, CalendarDays } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
-import { PageHeader } from "@/components/layout/PageHeader"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -45,7 +44,7 @@ export default function Dashboard() {
 
   if (isLoading || !metrics) {
     return (
-      <div className="flex h-[80vh] w-full items-center justify-center">
+      <div className="flex h-[60vh] lg:h-[calc(100dvh-60px-4rem)] w-full items-center justify-center">
         <div className="flex flex-col items-center gap-4 text-muted-foreground">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
           <p>Loading dashboard...</p>
@@ -84,6 +83,13 @@ export default function Dashboard() {
       dot: "bg-cyan-500"
     },
     {
+      title: "Demo follow-up",
+      value: metrics.demoFollowUp || 0,
+      status: "Demo follow-up",
+      color: "bg-card text-card-foreground border-border dark:bg-card dark:text-card-foreground dark:border-border",
+      dot: "bg-violet-500"
+    },
+    {
       title: "Interested", 
       value: metrics.interested, 
       status: "Interested",
@@ -114,12 +120,12 @@ export default function Dashboard() {
   ]
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <PageHeader
-          title="Pipeline Overview"
-          description="Monitor the real-time status of all your Customers and Companies."
-        />
+    <div className="flex flex-col gap-4 lg:h-[calc(100dvh-60px-4rem)] lg:min-h-0">
+      <div className="flex shrink-0 flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-bold tracking-tight">Pipeline Overview</h1>
+          <p className="mt-1 text-muted-foreground">Monitor the real-time status of all your Customers and Companies.</p>
+        </div>
         
         <div className="flex flex-wrap items-center justify-end gap-3">
           <Select value={statsPeriod} onValueChange={setStatsPeriod}>
@@ -184,22 +190,22 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:min-h-0 lg:flex-1 lg:grid-rows-3">
         {statCards.map((metric, idx) => (
           <Card 
             key={idx} 
-            className={`shadow-sm border-2 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg ${metric.color}`}
-            onClick={() => navigate({ to: '/leads', search: { status: metric.status } })}
+            className={`min-w-0 lg:min-h-0 lg:flex lg:flex-col lg:justify-center shadow-sm border-2 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg ${metric.color}`}
+            onClick={() => navigate({ to: '/leads', search: { status: metric.status, ...(metric.status === "Demo follow-up" ? { period: statsPeriod, startDate: dateRange.startDate, endDate: dateRange.endDate, month: selectedMonth, year: selectedYear } : {}) } })}
           >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 px-5 pt-4 pb-2 lg:pt-[clamp(0.25rem,1.5dvh,1rem)] lg:pb-1">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <div className={`h-3 w-3 rounded-full ${metric.dot}`} />
+                <div className={`h-3 w-3 shrink-0 rounded-full ${metric.dot}`} />
                 {metric.title}
               </CardTitle>
-              <ArrowRight className="h-4 w-4 opacity-50" />
+              <ArrowRight className="h-4 w-4 shrink-0 opacity-50" />
             </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold mt-2">{metric.value}</div>
+            <CardContent className="px-5 pt-0 pb-4 lg:pb-[clamp(0.25rem,1.5dvh,1rem)]">
+              <div className="text-3xl font-bold">{metric.value}</div>
             </CardContent>
           </Card>
         ))}
