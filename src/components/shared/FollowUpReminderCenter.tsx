@@ -76,6 +76,11 @@ export function FollowUpReminderCenter() {
     }
     socket.on("connect", register)
     socket.on("follow_up_reminder", receiveReminder)
+    const removeCancelled = ({ _id }: { _id: string }) => {
+      snoozedUntil.current.delete(_id)
+      setReminders((current) => current.filter((item) => item._id !== _id))
+    }
+    socket.on("follow_up_cancelled", removeCancelled)
     const recoverWhenVisible = () => {
       if (document.visibilityState === "visible") void loadPending()
     }
@@ -87,6 +92,7 @@ export function FollowUpReminderCenter() {
       hasConnected.current = false
       socket.off("connect", register)
       socket.off("follow_up_reminder", receiveReminder)
+      socket.off("follow_up_cancelled", removeCancelled)
       releaseRealtimeSocket(socket)
       document.removeEventListener("visibilitychange", recoverWhenVisible)
       window.removeEventListener("online", loadPending)
