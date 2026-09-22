@@ -1,6 +1,6 @@
 import { DemoFollowUpFields } from "@/components/leads/DemoFollowUpFields"
 import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from "react"
-import { useParams, useNavigate } from "@tanstack/react-router"
+import { useParams, useNavigate, useSearch } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { useSelector } from "react-redux"
 import { leadSummaryQueryOptions } from "@/lib/leadQueries"
@@ -155,6 +155,7 @@ function NotificationToggle({
 
 export default function UnifiedLeadDetails() {
   const { type, id } = useParams({ strict: false }) as any
+  const returnSearch = useSearch({ strict: false }) as Record<string, unknown>
   const leadType = type || "Company"
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -197,6 +198,20 @@ export default function UnifiedLeadDetails() {
   const canAssignLeads = can(currentUser, "leads.assign")
   const canAddLeadNotes = can(currentUser, "leads.add_note")
   const canManageLeadNotifications = can(currentUser, "leads.manage_notifications")
+
+  const backToLeadList = () => {
+    if (leadType !== "Company") {
+      void navigate({ to: "/leads/all" })
+      return
+    }
+    const allowedKeys = ["status", "period", "startDate", "endDate", "month", "year"]
+    const preservedSearch = Object.fromEntries(
+      allowedKeys
+        .filter((key) => typeof returnSearch[key] === "string" && returnSearch[key] !== "")
+        .map((key) => [key, returnSearch[key] as string]),
+    )
+    void navigate({ to: "/leads", search: preservedSearch })
+  }
 
   const getAttachmentUrl = (url: string) => {
     if (!url) return ""
@@ -281,7 +296,7 @@ export default function UnifiedLeadDetails() {
       }, 0)
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to fetch lead details")
-      navigate({ to: leadType === "Company" ? '/leads' : '/leads/all' })
+      backToLeadList()
     } finally {
       setLoading(false)
     }
@@ -705,7 +720,7 @@ export default function UnifiedLeadDetails() {
     <div className="flex flex-col gap-5 pb-8 text-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate({ to: leadType === "Company" ? '/leads' : '/leads/all' })}>
+        <Button variant="ghost" size="icon" onClick={backToLeadList}>
           <ArrowLeft className="h-5 w-5" />
         </Button>
           <button

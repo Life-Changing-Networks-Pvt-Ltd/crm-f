@@ -28,15 +28,15 @@ export default function Leads() {
   const navigate = useNavigate()
   const searchParams = useSearch({ strict: false }) as { status?: string; period?: string; startDate?: string; endDate?: string; month?: string; year?: string }
   const currentUser = useSelector((state: RootState) => state.auth.user)
-  const [statsPeriod, setStatsPeriod] = useState(searchParams.status === "Demo follow-up" ? searchParams.period || "today" : "today")
+  const [statsPeriod, setStatsPeriod] = useState(searchParams.period || "today")
   const [listStatus, setListStatus] = useState(searchParams.status || "all")
   const today = indiaDateInputValue()
   const currentMonth = today.slice(0, 7)
   const currentYear = new Date().getFullYear().toString()
-  const [dateRange, setDateRange] = useState({ startDate: searchParams.status === "Demo follow-up" ? searchParams.startDate || today : today, endDate: searchParams.status === "Demo follow-up" ? searchParams.endDate || today : today })
-  const [selectedMonth, setSelectedMonth] = useState(searchParams.status === "Demo follow-up" ? searchParams.month || currentMonth : currentMonth)
-  const [selectedYear, setSelectedYear] = useState(searchParams.status === "Demo follow-up" ? searchParams.year || currentYear : currentYear)
-  const [yearInput, setYearInput] = useState(searchParams.status === "Demo follow-up" ? searchParams.year || currentYear : currentYear)
+  const [dateRange, setDateRange] = useState({ startDate: searchParams.startDate || today, endDate: searchParams.endDate || today })
+  const [selectedMonth, setSelectedMonth] = useState(searchParams.month || currentMonth)
+  const [selectedYear, setSelectedYear] = useState(searchParams.year || currentYear)
+  const [yearInput, setYearInput] = useState(searchParams.year || currentYear)
   const startDateRef = useRef<HTMLInputElement>(null)
   const endDateRef = useRef<HTMLInputElement>(null)
   const monthRef = useRef<HTMLInputElement>(null)
@@ -83,9 +83,44 @@ export default function Leads() {
     }
   }, [searchParams.status])
 
+  const leadsSearch = ({
+    status = listStatus,
+    period = statsPeriod,
+    startDate = dateRange.startDate,
+    endDate = dateRange.endDate,
+    month = selectedMonth,
+    year = selectedYear,
+  } = {}) => ({
+    ...(status !== "all" ? { status } : {}),
+    period,
+    ...(period === "date" ? { startDate, endDate } : {}),
+    ...(period === "month" ? { month } : {}),
+    ...(period === "year" ? { year } : {}),
+  })
+
+  const persistLeadsSearch = (values: Parameters<typeof leadsSearch>[0]) => {
+    void navigate({
+      to: "/leads",
+      search: leadsSearch(values),
+      replace: true,
+      resetScroll: false,
+    })
+  }
+
+  const changeStatsPeriod = (period: string) => {
+    setStatsPeriod(period)
+    persistLeadsSearch({ period })
+  }
+
+  const changeListStatus = (status: string) => {
+    setListStatus(status)
+    persistLeadsSearch({ status })
+  }
+
   const commitYear = () => {
     if (/^\d{4}$/.test(yearInput) && Number(yearInput) >= 1900 && Number(yearInput) <= 2100) {
       setSelectedYear(yearInput)
+      persistLeadsSearch({ period: "year", year: yearInput })
     } else {
       setYearInput(selectedYear)
     }
@@ -103,7 +138,7 @@ export default function Leads() {
   ];
 
   const showLeadsForStatus = (status: string) => {
-    setListStatus(status)
+    changeListStatus(status)
     requestAnimationFrame(() => {
       leadsTableRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
     })
@@ -113,7 +148,7 @@ export default function Leads() {
     <div className="flex flex-col gap-6">
       <PageHeader title="Company Leads" description="Manage company leads, primary contacts and follow-ups.">
         <div className="flex items-center gap-3">
-          <Select value={statsPeriod} onValueChange={setStatsPeriod}>
+          <Select value={statsPeriod} onValueChange={changeStatsPeriod}>
             <SelectTrigger className="w-[150px] bg-background">
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
@@ -131,14 +166,20 @@ export default function Leads() {
                 inputRef={startDateRef}
                 type="date"
                 value={dateRange.startDate}
-                onChange={(value) => setDateRange((prev) => ({ ...prev, startDate: value }))}
+                onChange={(value) => {
+                  setDateRange((prev) => ({ ...prev, startDate: value }))
+                  persistLeadsSearch({ period: "date", startDate: value })
+                }}
                 className="w-[145px]"
               />
               <PickerInput
                 inputRef={endDateRef}
                 type="date"
                 value={dateRange.endDate}
-                onChange={(value) => setDateRange((prev) => ({ ...prev, endDate: value }))}
+                onChange={(value) => {
+                  setDateRange((prev) => ({ ...prev, endDate: value }))
+                  persistLeadsSearch({ period: "date", endDate: value })
+                }}
                 className="w-[145px]"
               />
             </div>
@@ -148,7 +189,10 @@ export default function Leads() {
               inputRef={monthRef}
               type="month"
               value={selectedMonth}
-              onChange={setSelectedMonth}
+              onChange={(value) => {
+                setSelectedMonth(value)
+                persistLeadsSearch({ period: "month", month: value })
+              }}
               className="w-[155px]"
             />
           )}
@@ -213,7 +257,8 @@ export default function Leads() {
       <div ref={leadsTableRef}>
         <CompanyLeadsTable
           status={listStatus}
-          onStatusChange={setListStatus}
+          onStatusChange={changeListStatus}
+          returnSearch={leadsSearch()}
           dateFilters={{
             period: statsPeriod,
             startDate: dateRange.startDate,

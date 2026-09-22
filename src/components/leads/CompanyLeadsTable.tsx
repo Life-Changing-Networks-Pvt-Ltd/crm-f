@@ -85,10 +85,12 @@ export function CompanyLeadsTable({
   status,
   onStatusChange,
   dateFilters,
+  returnSearch,
 }: {
   status: string
   onStatusChange: (status: string) => void
   dateFilters: CompanyLeadDateFilters
+  returnSearch: Record<string, string>
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -358,7 +360,7 @@ export function CompanyLeadsTable({
                         className="text-left font-semibold text-primary hover:underline"
                         onMouseEnter={() => prefetchLead(company._id)}
                         onFocus={() => prefetchLead(company._id)}
-                        onClick={() => navigate({ to: "/leads/$id", params: { id: company._id } })}
+                        onClick={() => navigate({ to: "/leads/$id", params: { id: company._id }, search: returnSearch })}
                       >
                         {company.companyName}
                       </button>
@@ -392,7 +394,7 @@ export function CompanyLeadsTable({
                           title="View lead"
                           onMouseEnter={() => prefetchLead(company._id)}
                           onFocus={() => prefetchLead(company._id)}
-                          onClick={() => navigate({ to: "/leads/$id", params: { id: company._id } })}
+                          onClick={() => navigate({ to: "/leads/$id", params: { id: company._id }, search: returnSearch })}
                         >
                           <Eye className="h-4 w-4 text-blue-500" />
                         </Button>
