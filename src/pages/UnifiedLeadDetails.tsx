@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from 
 import { useParams, useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { useSelector } from "react-redux"
+import { leadSummaryQueryOptions } from "@/lib/leadQueries"
 import type { RootState } from "@/store"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Eye, FileText, Headphones, Loader2, MessageSquare, Paperclip, X, Phone, Mail } from "lucide-react"
@@ -224,8 +225,36 @@ export default function UnifiedLeadDetails() {
   useEffect(() => {
     fetchLead()
     if (canAssignLeads) fetchUsers()
-    if (canViewCalls) fetchCallLogs()
   }, [id, leadType])
+
+  const fetchLeadActivity = async () => {
+    try {
+      const response = await api.get(`/leads/unified/${leadType}/${id}/activity`)
+      const activity = response.data.data || {}
+      setLead((current: any) => current ? ({
+        ...current,
+        statusHistory: activity.statusHistory || [],
+        messages: activity.messages || [],
+        comments: activity.comments || [],
+      }) : current)
+    } catch (error) {
+      console.error("Failed to fetch lead activity", error)
+    }
+  }
+
+  const fetchFollowUpHistory = async (leadData: any) => {
+    if (leadType !== "Company") return
+    try {
+      const response = await api.get(`/follow-ups/lead/${id}`)
+      const activeFollowUp = response.data?.data?.active
+      setFollowUpHistory(response.data?.data?.items || [])
+      setFollowUpForm(followUpFormFromLead(activeFollowUp || leadData))
+      setCommentText(activeFollowUp?.message || "")
+    } catch (error) {
+      console.error("Failed to fetch follow-up history", error)
+      setFollowUpForm(followUpFormFromLead(leadData))
+    }
+  }
 
   const fetchUsers = async () => {
     try {
@@ -239,24 +268,17 @@ export default function UnifiedLeadDetails() {
   const fetchLead = async () => {
     try {
       setLoading(true)
-      const followUpRequest = leadType === "Company"
-        ? api.get(`/follow-ups/lead/${id}`).catch((error) => {
-            console.error("Failed to fetch follow-up history", error)
-            return null
-          })
-        : Promise.resolve(null)
-      const [leadResponse, followUpResponse] = await Promise.all([
-        api.get(`/leads/unified/${leadType}/${id}`),
-        followUpRequest,
-      ])
-      const leadData = leadResponse.data.data
-      const activeFollowUp = followUpResponse?.data?.data?.active
+      const leadData = await queryClient.fetchQuery(leadSummaryQueryOptions(leadType, id))
       setLead(leadData)
       setSelectedStatus(leadData.leadStatus)
       setStatusDetails(statusDetailsForm(leadData.leadStatus, leadData.statusDetails))
-      setFollowUpHistory(followUpResponse?.data?.data?.items || [])
-      setFollowUpForm(followUpFormFromLead(activeFollowUp || leadData))
-      setCommentText(activeFollowUp?.message || "")
+      setFollowUpForm(followUpFormFromLead(leadData))
+      setLoading(false)
+      window.setTimeout(() => {
+        void fetchLeadActivity()
+        void fetchFollowUpHistory(leadData)
+        if (canViewCalls) void fetchCallLogs()
+      }, 0)
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to fetch lead details")
       navigate({ to: leadType === "Company" ? '/leads' : '/leads/all' })

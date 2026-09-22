@@ -63,6 +63,8 @@ api.interceptors.response.use(
     ) {
       void queryClient.invalidateQueries({ queryKey: ['dashboard', 'metrics'] });
       void queryClient.invalidateQueries({ queryKey: ['leads', 'stats'] });
+      void queryClient.invalidateQueries({ queryKey: ['lead-detail'] });
+      void queryClient.invalidateQueries({ queryKey: ['paged', '/companies/paged'] });
     }
     return response;
   },

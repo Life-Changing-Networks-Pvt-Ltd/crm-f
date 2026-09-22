@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { can } from "@/lib/accessControl"
+import { leadSummaryQueryOptions } from "@/lib/leadQueries"
 
 interface CompanyLead {
   _id: string
@@ -101,22 +102,36 @@ export function CompanyLeadsTable({
   const [assignee, setAssignee] = useState("")
   const [assigning, setAssigning] = useState(false)
   const debouncedSearch = useDebouncedValue(search)
+  const pageLimit = 15
+  const queryParams = useMemo(() => ({
+    search: debouncedSearch,
+    status,
+    city,
+    period: status === "all" ? undefined : dateFilters.period,
+    startDate: status !== "all" && dateFilters.period === "date" ? dateFilters.startDate : undefined,
+    endDate: status !== "all" && dateFilters.period === "date" ? dateFilters.endDate : undefined,
+    month: status !== "all" && dateFilters.period === "month" ? dateFilters.month : undefined,
+    year: status !== "all" && dateFilters.period === "year" ? dateFilters.year : undefined,
+  }), [
+    city,
+    dateFilters.endDate,
+    dateFilters.month,
+    dateFilters.period,
+    dateFilters.startDate,
+    dateFilters.year,
+    debouncedSearch,
+    status,
+  ])
+  const normalizedQueryParams = useMemo(() => Object.fromEntries(
+    Object.entries(queryParams).filter(([, value]) => value !== undefined && value !== ""),
+  ), [queryParams])
 
   const { data, isLoading, isFetching, refetch } = usePaginatedQuery<CompanyLead>({
     endpoint: "/companies/paged",
     page,
-    limit: 25,
-    params: {
-      search: debouncedSearch,
-      status,
-      city,
-      period: status === "all" ? undefined : dateFilters.period,
-      startDate: status !== "all" && dateFilters.period === "date" ? dateFilters.startDate : undefined,
-      endDate: status !== "all" && dateFilters.period === "date" ? dateFilters.endDate : undefined,
-      month: status !== "all" && dateFilters.period === "month" ? dateFilters.month : undefined,
-      year: status !== "all" && dateFilters.period === "year" ? dateFilters.year : undefined,
-    },
-    staleTime: 30_000,
+    limit: pageLimit,
+    params: queryParams,
+    staleTime: 5 * 60_000,
   })
 
   const companies = useMemo(() => data?.items || [], [data?.items])
@@ -158,9 +173,30 @@ export function CompanyLeadsTable({
     dateFilters.year,
   ])
 
+  useEffect(() => {
+    if (!data?.pagination.hasNext) return
+    const nextPage = data.pagination.page + 1
+    void queryClient.prefetchQuery({
+      queryKey: ["paged", "/companies/paged", nextPage, pageLimit, normalizedQueryParams],
+      staleTime: 5 * 60_000,
+      gcTime: 30 * 60_000,
+      queryFn: async ({ signal }) => {
+        const response = await api.get("/companies/paged", {
+          params: { page: nextPage, limit: pageLimit, ...normalizedQueryParams },
+          signal,
+        })
+        return response.data.data
+      },
+    })
+  }, [data?.pagination.hasNext, data?.pagination.page, normalizedQueryParams, queryClient])
+
   const canEditLeads = can(user, "leads.edit")
   const canDeleteLeads = can(user, "leads.delete")
   const canAssignLeads = can(user, "leads.assign")
+
+  const prefetchLead = (leadId: string) => {
+    void queryClient.prefetchQuery(leadSummaryQueryOptions("Company", leadId))
+  }
 
   const toggleAll = (checked: boolean) => {
     setSelectedIds((current) => checked
@@ -320,6 +356,8 @@ export function CompanyLeadsTable({
                       <button
                         type="button"
                         className="text-left font-semibold text-primary hover:underline"
+                        onMouseEnter={() => prefetchLead(company._id)}
+                        onFocus={() => prefetchLead(company._id)}
                         onClick={() => navigate({ to: "/leads/$id", params: { id: company._id } })}
                       >
                         {company.companyName}
@@ -348,7 +386,14 @@ export function CompanyLeadsTable({
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" title="View lead" onClick={() => navigate({ to: "/leads/$id", params: { id: company._id } })}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="View lead"
+                          onMouseEnter={() => prefetchLead(company._id)}
+                          onFocus={() => prefetchLead(company._id)}
+                          onClick={() => navigate({ to: "/leads/$id", params: { id: company._id } })}
+                        >
                           <Eye className="h-4 w-4 text-blue-500" />
                         </Button>
                         {canEditLeads && (
