@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
 import { useSelector } from "react-redux"
@@ -19,6 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { can } from "@/lib/accessControl"
 import { leadSummaryQueryOptions } from "@/lib/leadQueries"
+
+const LEAD_LIST_RETURN_STORAGE_KEY = "crm:company-leads:return-context"
 
 interface CompanyLead {
   _id: string
@@ -55,6 +57,13 @@ interface CompanyLeadDateFilters {
   year: string
 }
 
+interface LeadListRestoreContext {
+  leadId?: string
+  page: number
+  search: string
+  city: string
+}
+
 const STATUSES = [
   { value: "New", label: "New" },
   { value: "Demo Scheduled", label: "Demo Scheduled" },
@@ -86,24 +95,40 @@ export function CompanyLeadsTable({
   onStatusChange,
   dateFilters,
   returnSearch,
+  restoreContext,
 }: {
   status: string
   onStatusChange: (status: string) => void
   dateFilters: CompanyLeadDateFilters
   returnSearch: Record<string, string>
+  restoreContext: LeadListRestoreContext
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useSelector((state: RootState) => state.auth)
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState("")
-  const [city, setCity] = useState("all")
+  const [page, setPage] = useState(restoreContext.page)
+  const [search, setSearch] = useState(restoreContext.search)
+  const [city, setCity] = useState(restoreContext.city)
+  const [highlightedLeadId, setHighlightedLeadId] = useState<string | null>(restoreContext.leadId || null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([])
   const [assignableUsersLoaded, setAssignableUsersLoaded] = useState(false)
   const [assignee, setAssignee] = useState("")
   const [assigning, setAssigning] = useState(false)
+  const focusedRowRef = useRef<HTMLTableRowElement | null>(null)
+  const focusRestored = useRef(false)
   const debouncedSearch = useDebouncedValue(search)
+  const filterStateKey = JSON.stringify([
+    status,
+    city,
+    debouncedSearch,
+    dateFilters.period,
+    dateFilters.startDate,
+    dateFilters.endDate,
+    dateFilters.month,
+    dateFilters.year,
+  ])
+  const previousFilterStateKey = useRef(filterStateKey)
   const pageLimit = 15
   const queryParams = useMemo(() => ({
     search: debouncedSearch,
@@ -162,18 +187,33 @@ export function CompanyLeadsTable({
   }, [assignableUsersLoaded, selectedIds.length])
 
   useEffect(() => {
+    if (previousFilterStateKey.current === filterStateKey) return
+    previousFilterStateKey.current = filterStateKey
     setSelectedIds([])
     setPage(1)
-  }, [
-    status,
-    city,
-    debouncedSearch,
-    dateFilters.period,
-    dateFilters.startDate,
-    dateFilters.endDate,
-    dateFilters.month,
-    dateFilters.year,
-  ])
+  }, [filterStateKey])
+
+  useEffect(() => {
+    if (!restoreContext.leadId || focusRestored.current || isLoading || isFetching) return
+    if (data?.pagination.page !== restoreContext.page) return
+    if (!companies.some((company) => company._id === restoreContext.leadId)) return
+
+    const scrollTimer = window.setTimeout(() => {
+      const row = focusedRowRef.current
+      row?.scrollIntoView({ behavior: "auto", block: "center" })
+      focusRestored.current = true
+      try {
+        window.sessionStorage.removeItem(LEAD_LIST_RETURN_STORAGE_KEY)
+      } catch {
+        // URL context still provides the return behavior when storage is unavailable.
+      }
+    }, 120)
+    const highlightTimer = window.setTimeout(() => setHighlightedLeadId(null), 2_000)
+    return () => {
+      window.clearTimeout(scrollTimer)
+      window.clearTimeout(highlightTimer)
+    }
+  }, [companies, data?.pagination.page, isFetching, isLoading, restoreContext.leadId, restoreContext.page])
 
   useEffect(() => {
     if (!data?.pagination.hasNext) return
@@ -198,6 +238,34 @@ export function CompanyLeadsTable({
 
   const prefetchLead = (leadId: string) => {
     void queryClient.prefetchQuery(leadSummaryQueryOptions("Company", leadId))
+  }
+
+  const openLead = async (leadId: string) => {
+    const returnContext = {
+      ...returnSearch,
+      focusLead: leadId,
+      listPage: page,
+      ...(search ? { listSearch: search } : {}),
+      ...(city !== "all" ? { listCity: city } : {}),
+    }
+
+    try {
+      window.sessionStorage.setItem(LEAD_LIST_RETURN_STORAGE_KEY, JSON.stringify({
+        leadId,
+        page,
+        search,
+        city,
+        savedAt: Date.now(),
+      }))
+    } catch {
+      // Continue with URL/history context when storage is unavailable.
+    }
+
+    await navigate({
+      to: "/leads/$id",
+      params: { id: leadId },
+      search: returnContext,
+    })
   }
 
   const toggleAll = (checked: boolean) => {
@@ -342,7 +410,13 @@ export function CompanyLeadsTable({
                     </TableCell>
                   </TableRow>
                 ) : companies.map((company) => (
-                  <TableRow key={company._id} className="hover:bg-muted/30">
+                  <TableRow
+                    key={company._id}
+                    ref={company._id === restoreContext.leadId ? focusedRowRef : undefined}
+                    className={company._id === highlightedLeadId
+                      ? "bg-primary/10 ring-1 ring-inset ring-primary/30 transition-colors"
+                      : "hover:bg-muted/30"}
+                  >
                     <TableCell>
                       {canAssignLeads && (
                         <Checkbox
@@ -360,7 +434,7 @@ export function CompanyLeadsTable({
                         className="text-left font-semibold text-primary hover:underline"
                         onMouseEnter={() => prefetchLead(company._id)}
                         onFocus={() => prefetchLead(company._id)}
-                        onClick={() => navigate({ to: "/leads/$id", params: { id: company._id }, search: returnSearch })}
+                        onClick={() => openLead(company._id)}
                       >
                         {company.companyName}
                       </button>
@@ -394,7 +468,7 @@ export function CompanyLeadsTable({
                           title="View lead"
                           onMouseEnter={() => prefetchLead(company._id)}
                           onFocus={() => prefetchLead(company._id)}
-                          onClick={() => navigate({ to: "/leads/$id", params: { id: company._id }, search: returnSearch })}
+                          onClick={() => openLead(company._id)}
                         >
                           <Eye className="h-4 w-4 text-blue-500" />
                         </Button>

@@ -204,13 +204,27 @@ export default function UnifiedLeadDetails() {
       void navigate({ to: "/leads/all" })
       return
     }
-    const allowedKeys = ["status", "period", "startDate", "endDate", "month", "year"]
+    const allowedKeys = [
+      "status",
+      "period",
+      "startDate",
+      "endDate",
+      "month",
+      "year",
+      "focusLead",
+      "listPage",
+      "listSearch",
+      "listCity",
+    ]
     const preservedSearch = Object.fromEntries(
       allowedKeys
-        .filter((key) => typeof returnSearch[key] === "string" && returnSearch[key] !== "")
-        .map((key) => [key, returnSearch[key] as string]),
+        .filter((key) => (
+          (typeof returnSearch[key] === "string" && returnSearch[key] !== "")
+          || typeof returnSearch[key] === "number"
+        ))
+        .map((key) => [key, returnSearch[key] as string | number]),
     )
-    void navigate({ to: "/leads", search: preservedSearch })
+    void navigate({ to: "/leads", search: preservedSearch, resetScroll: false })
   }
 
   const getAttachmentUrl = (url: string) => {

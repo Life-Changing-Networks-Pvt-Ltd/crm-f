@@ -13,6 +13,44 @@ import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
 import { can } from "@/lib/accessControl"
 
+const LEAD_LIST_RETURN_STORAGE_KEY = "crm:company-leads:return-context"
+
+interface StoredLeadListReturnContext {
+  leadId: string
+  page: number
+  search: string
+  city: string
+  savedAt: number
+}
+
+const readStoredLeadListReturnContext = (): StoredLeadListReturnContext | null => {
+  try {
+    const stored = window.sessionStorage.getItem(LEAD_LIST_RETURN_STORAGE_KEY)
+    if (!stored) return null
+    const parsed = JSON.parse(stored) as Partial<StoredLeadListReturnContext>
+    if (
+      typeof parsed.leadId !== "string"
+      || typeof parsed.page !== "number"
+      || !Number.isInteger(parsed.page)
+      || parsed.page < 1
+      || typeof parsed.savedAt !== "number"
+      || Date.now() - parsed.savedAt > 30 * 60_000
+    ) {
+      window.sessionStorage.removeItem(LEAD_LIST_RETURN_STORAGE_KEY)
+      return null
+    }
+    return {
+      leadId: parsed.leadId,
+      page: parsed.page,
+      search: typeof parsed.search === "string" ? parsed.search : "",
+      city: typeof parsed.city === "string" ? parsed.city : "all",
+      savedAt: parsed.savedAt,
+    }
+  } catch {
+    return null
+  }
+}
+
 const indiaDateInputValue = () => {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Kolkata",
@@ -26,7 +64,19 @@ const indiaDateInputValue = () => {
 
 export default function Leads() {
   const navigate = useNavigate()
-  const searchParams = useSearch({ strict: false }) as { status?: string; period?: string; startDate?: string; endDate?: string; month?: string; year?: string }
+  const searchParams = useSearch({ strict: false }) as {
+    status?: string
+    period?: string
+    startDate?: string
+    endDate?: string
+    month?: string
+    year?: string
+    focusLead?: string
+    listPage?: string | number
+    listSearch?: string
+    listCity?: string
+  }
+  const [storedReturnContext] = useState(readStoredLeadListReturnContext)
   const currentUser = useSelector((state: RootState) => state.auth.user)
   const [statsPeriod, setStatsPeriod] = useState(searchParams.period || "today")
   const [listStatus, setListStatus] = useState(searchParams.status || "all")
@@ -41,6 +91,7 @@ export default function Leads() {
   const endDateRef = useRef<HTMLInputElement>(null)
   const monthRef = useRef<HTMLInputElement>(null)
   const leadsTableRef = useRef<HTMLDivElement>(null)
+  const returnLeadId = searchParams.focusLead || storedReturnContext?.leadId
 
   const defaultStats = {
     totalLeads: 0,
@@ -82,6 +133,14 @@ export default function Leads() {
       })
     }
   }, [searchParams.status])
+
+  useEffect(() => {
+    if (!returnLeadId) return
+    const frameId = requestAnimationFrame(() => {
+      leadsTableRef.current?.scrollIntoView({ behavior: "auto", block: "start" })
+    })
+    return () => cancelAnimationFrame(frameId)
+  }, [returnLeadId])
 
   const leadsSearch = ({
     status = listStatus,
@@ -259,6 +318,12 @@ export default function Leads() {
           status={listStatus}
           onStatusChange={changeListStatus}
           returnSearch={leadsSearch()}
+          restoreContext={{
+            leadId: returnLeadId,
+            page: Math.max(1, Math.trunc(Number(searchParams.listPage) || storedReturnContext?.page || 1)),
+            search: searchParams.listSearch ?? storedReturnContext?.search ?? "",
+            city: searchParams.listCity ?? storedReturnContext?.city ?? "all",
+          }}
           dateFilters={{
             period: statsPeriod,
             startDate: dateRange.startDate,
