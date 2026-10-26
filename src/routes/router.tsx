@@ -36,6 +36,7 @@ const PageAccess = lazyPage(() => import('../pages/PageAccess'));
 const Teams = lazyPage(() => import('../pages/Teams'));
 const TemplateAccess = lazyPage(() => import('../pages/TemplateAccess'));
 const AuditLogs = lazyPage(() => import('../pages/AuditLogs'));
+const Vendors = lazyPage(() => import('../pages/Vendors'));
 const Profile = lazyPage(() => import('../pages/Profile'));
 const Notifications = lazyPage(() => import('../pages/Notifications'));
 const Calling = lazyPage(() => import('../pages/Calling'));
@@ -182,6 +183,7 @@ const templateAccessRoute = createRoute({
   ),
 });
 const auditLogsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/audit-logs', component: AuditLogs, beforeLoad: requireGrant('admin.audit.view') });
+const vendorsRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/vendors', component: Vendors, beforeLoad: requireGrant('admin.users.view') });
 
 // System Routes
 const profileRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/profile', component: Profile });
@@ -231,6 +233,7 @@ const routeTree = rootRoute.addChildren([
     teamsRoute,
     templateAccessRoute,
     auditLogsRoute,
+    vendorsRoute,
     settingsRoute,
     profileRoute,
     notificationsRoute,

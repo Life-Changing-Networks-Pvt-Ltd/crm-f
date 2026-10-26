@@ -471,7 +471,9 @@ export default function UnifiedLeadDetails() {
       setSavingStatusDetails(true)
       const response = await api.put(`/leads/unified/${leadType}/${id}/status`, {
         status: selectedStatus,
-        ...(leadType === "Company" || selectedStatus === "Demo follow-up" ? { details: selectedStatus === "Demo follow-up" ? { ...statusDetails, demoFollowUpDateTime: new Date(statusDetails.demoFollowUpDateTime).toISOString() } : statusDetails } : {}),
+        details: selectedStatus === "Demo follow-up"
+          ? { ...statusDetails, demoFollowUpDateTime: new Date(statusDetails.demoFollowUpDateTime).toISOString() }
+          : leadType === "Company" ? statusDetails : { note: comment },
         comment,
       })
       const savedAt = response.data.data?.statusDetails?.savedAt || new Date().toISOString()
@@ -485,7 +487,7 @@ export default function UnifiedLeadDetails() {
         ...current,
         leadStatus: selectedStatus,
         leadStatusChangedAt: response.data.data?.leadStatusChangedAt,
-        ...(leadType === "Company" || selectedStatus === "Demo follow-up" ? { statusDetails: response.data.data?.statusDetails } : {}),
+        statusDetails: response.data.data?.statusDetails,
         statusHistory: [{
           oldStatus: current.leadStatus,
           newStatus: selectedStatus,
@@ -652,48 +654,10 @@ export default function UnifiedLeadDetails() {
     ? assignedUsers.map((user: any) => user?.name || "Unknown").join(", ")
     : "-"
 
-  const persistedStatusActivities = (lead?.statusHistory || [])
-    .map((item: any) => ({
-      ...item,
-      activityType: item.entryType === "details_saved" ? "status-note" : "status-change",
-      text: item.entryType === "details_saved" ? item.details?.note : item.comment,
-      status: item.newStatus,
-      createdAt: item.changedAt || item.createdAt,
-      createdBy: item.changedBy,
-      call: item.call,
-    }))
-    .filter((item: any) => item.text?.trim())
-  const currentDetailsAlreadyRecorded = persistedStatusActivities.some((item: any) =>
-    item.details
-    && item.status === lead?.statusDetails?.status
-    && Math.abs(
-      new Date(item.createdAt).getTime() - new Date(lead?.statusDetails?.savedAt).getTime(),
-    ) < 1000
-  )
-  const currentDetailsActivity = lead?.statusDetails?.savedAt && !currentDetailsAlreadyRecorded
-    ? [{
-        activityType: "status-note",
-        status: lead.statusDetails.status,
-        text: lead.statusDetails.note,
-        createdAt: lead.statusDetails.savedAt,
-        createdBy: lead.statusDetails.savedBy,
-      }]
-    : []
   const globalActivityItems = [
-    ...persistedStatusActivities,
-    ...currentDetailsActivity,
-    ...followUpHistory.map((item) => ({
-      ...item,
-      activityType: "follow-up",
-      text: item.message,
-      createdAt: item.createdAt,
-      createdBy: item.createdBy,
-      status: "Follow Up",
-    })),
     ...(lead?.comments || []).map((item: any) => ({
       ...item,
       activityType: "general-note",
-      status: item.status || null,
     })),
     ...(lead?.messages || []).map((item: any) => ({
       ...item,
@@ -703,15 +667,11 @@ export default function UnifiedLeadDetails() {
     })),
   ]
     .filter((item: any) => item.text?.trim())
-    .filter((item: any) => !(
-      item.activityType === "status-change"
-      && item.status === "Follow Up"
-      && followUpHistory.some((followUp) =>
-        followUp.message?.trim() === item.text.trim()
-        && Math.abs(new Date(followUp.createdAt).getTime() - new Date(item.createdAt).getTime()) < 60_000
-      )
-    ))
     .sort((left: any, right: any) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
+  const hasSavedFollowUp = lead?.followUpRequired === true
+    || followUpHistory.some((item) => ["Pending", "Snoozed"].includes(item.status))
+  const hasSavedStatusDetails = lead?.statusDetails?.status === selectedStatus
+    && Boolean(lead.statusDetails.savedAt)
 
   useEffect(() => {
     const container = activityContainerRef.current
@@ -1011,7 +971,7 @@ export default function UnifiedLeadDetails() {
 
                   <Button className="w-fit justify-self-end px-5 lg:col-span-2" onClick={handleSaveFollowUp} disabled={savingFollowUp}>
                     {savingFollowUp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Follow-up
+                    {hasSavedFollowUp ? "Update Follow-up" : "Save Follow-up"}
                   </Button>
                 </div>
               )}
@@ -1021,6 +981,7 @@ export default function UnifiedLeadDetails() {
                   details={statusDetails}
                   setDetails={setStatusDetails}
                   saving={savingStatusDetails}
+                  isSaved={hasSavedStatusDetails}
                   onSave={handleSaveStatusDetails}
                 />
               )}
@@ -1030,6 +991,7 @@ export default function UnifiedLeadDetails() {
                   note={statusDetails.note}
                   onNoteChange={(note) => setStatusDetails((current) => ({ ...current, note }))}
                   saving={savingStatusDetails}
+                  isSaved={hasSavedStatusDetails}
                   onSave={handleSaveStatusDetails}
                 />
               )}
@@ -1069,7 +1031,9 @@ export default function UnifiedLeadDetails() {
                     <div key={`${item._id || item.createdAt}-${index}`} className={`flex ${isOwnNote ? "justify-end" : "justify-start"}`}>
                       <div className={`max-w-[88%] rounded-2xl border px-4 py-3 shadow-sm sm:max-w-[75%] ${isOwnNote ? "rounded-br-md border-primary/20 bg-primary/10" : "rounded-bl-md bg-background"}`}>
                         <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline" className="bg-background/70">{item.status || "General Note"}</Badge>
+                          {item.activityType !== "general-note" && (
+                            <Badge variant="outline" className="bg-background/70">{item.status}</Badge>
+                          )}
                           {item.activityType === "follow-up" && (
                             <span className="text-[11px] font-medium text-muted-foreground">Follow-up</span>
                           )}
@@ -1166,8 +1130,8 @@ export default function UnifiedLeadDetails() {
               }}
               placeholder="Type a note..."
               maxLength={4000}
-              rows={1}
-              className="max-h-28 min-h-11 resize-none rounded-2xl"
+              rows={3}
+              className="max-h-40 min-h-24 resize-y rounded-2xl"
               disabled={savingGeneralNote}
             />
             <Button
@@ -1555,12 +1519,14 @@ function SimpleStatusNotePanel({
   note,
   onNoteChange,
   saving,
+  isSaved,
   onSave,
 }: {
   status: string
   note: string
   onNoteChange: (note: string) => void
   saving: boolean
+  isSaved: boolean
   onSave: () => void
 }) {
   return (
@@ -1581,7 +1547,7 @@ function SimpleStatusNotePanel({
       <div className="flex justify-end">
         <Button className="w-fit px-5" onClick={onSave} disabled={saving}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save {status}
+          {isSaved ? "Update" : "Save"} {status}
         </Button>
       </div>
     </div>
@@ -1593,12 +1559,14 @@ function StatusDetailsPanel({
   details,
   setDetails,
   saving,
+  isSaved,
   onSave,
 }: {
   status: string
   details: StatusDetailsForm
   setDetails: Dispatch<SetStateAction<StatusDetailsForm>>
   saving: boolean
+  isSaved: boolean
   onSave: () => void
 }) {
   const update = (field: keyof StatusDetailsForm, value: string) => {
@@ -1721,7 +1689,7 @@ function StatusDetailsPanel({
       <div className="flex justify-end">
         <Button className="w-fit px-5" onClick={onSave} disabled={saving}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save {status}
+          {isSaved ? "Update" : "Save"} {status}
         </Button>
       </div>
     </div>

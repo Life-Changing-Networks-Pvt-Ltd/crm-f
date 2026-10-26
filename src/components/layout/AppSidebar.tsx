@@ -20,7 +20,7 @@ import {
   Clock,
   PhoneCall
 } from "lucide-react"
-import { Share2 } from "lucide-react"
+import { Share2, Building2 } from "lucide-react"
 
 import {
   Sidebar,
@@ -98,6 +98,7 @@ const navItems = [
       { title: "Access Control", url: "/page-access", icon: Shield },
       { title: "Teams", url: "/teams", icon: Users2 },
       { title: "Template Access", url: "/template-access", icon: Share2 },
+      { title: "Vendors", url: "/vendors", icon: Building2 },
       { title: "Audit Logs", url: "/audit-logs", icon: ClipboardList },
       { title: "Settings", url: "/settings", icon: Settings },
     ],
@@ -121,9 +122,14 @@ export function AppSidebar() {
   }
 
   // Filter items based on permissions
+  const isVendorUser = String(user?.role || '').toLowerCase() === 'vendor';
   const filteredNavItems = navItems.map(group => ({
     ...group,
-    items: group.items.filter(item => hasAccess(item.url))
+    title: isVendorUser && group.title === "Administration" ? "Configuration" : group.title,
+    items: group.items.map(item => ({
+      ...item,
+      title: isVendorUser && item.url === "/employees" ? "My Team" : item.title,
+    })).filter(item => hasAccess(item.url))
   })).filter(group => group.items.length > 0);
 
   return (

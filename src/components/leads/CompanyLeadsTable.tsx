@@ -12,6 +12,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue"
 import { usePaginatedQuery } from "@/hooks/usePaginatedQuery"
 import { DataPagination } from "@/components/shared/DataPagination"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -33,6 +34,8 @@ interface CompanyLead {
   city?: string
   country?: string
   leadStatus?: string
+  leadSource?: string
+  products?: string
   followUpRequired?: boolean
   followUpDateTime?: string
   statusDetails?: { demoFollowUpDateTime?: string }
@@ -429,16 +432,30 @@ export function CompanyLeadsTable({
                       )}
                     </TableCell>
                     <TableCell>
-                      <button
-                        type="button"
-                        className="text-left font-semibold text-primary hover:underline"
-                        onMouseEnter={() => prefetchLead(company._id)}
-                        onFocus={() => prefetchLead(company._id)}
-                        onClick={() => openLead(company._id)}
-                      >
-                        {company.companyName}
-                      </button>
-                      {company.website1 && <div className="mt-0.5 max-w-[220px] truncate text-xs text-muted-foreground">{company.website1}</div>}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          className="text-left font-semibold text-primary hover:underline"
+                          onMouseEnter={() => prefetchLead(company._id)}
+                          onFocus={() => prefetchLead(company._id)}
+                          onClick={() => openLead(company._id)}
+                        >
+                          {company.companyName}
+                        </button>
+                        {company.leadSource === "IndiaMART" && (
+                          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-300 text-[10px] px-1.5 py-0 font-medium">
+                            IndiaMART
+                          </Badge>
+                        )}
+                      </div>
+                      {company.products && (
+                        <div className="mt-0.5 text-xs text-muted-foreground truncate max-w-[200px]" title={company.products}>
+                          Query: {company.products}
+                        </div>
+                      )}
+                      {!company.products && company.website1 && company.website1 !== 'https://indiamart.com' && (
+                        <div className="mt-0.5 max-w-[220px] truncate text-xs text-muted-foreground">{company.website1}</div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="font-medium">{company.customerName || "—"}</div>
