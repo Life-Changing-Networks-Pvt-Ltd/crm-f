@@ -12,7 +12,7 @@ import type { RootState } from "@/store"
 import { setSettings } from "@/store/slices/settingsSlice"
 import api from "@/services/api"
 import { toast } from "sonner"
-import { Moon, Sun, Laptop, RefreshCw, KeyRound, CheckCircle2, AlertCircle, Eye, EyeOff, Unplug, Loader2 } from "lucide-react"
+import { Moon, Sun, Laptop, RefreshCw, KeyRound, AlertCircle, Eye, EyeOff, Unplug, Loader2 } from "lucide-react"
 import { queryClient } from "@/lib/queryClient"
 import { referenceQueryKeys } from "@/hooks/useCrmReferenceData"
 
