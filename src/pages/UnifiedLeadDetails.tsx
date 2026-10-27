@@ -654,7 +654,44 @@ export default function UnifiedLeadDetails() {
     ? assignedUsers.map((user: any) => user?.name || "Unknown").join(", ")
     : "-"
 
+  const persistedStatusActivities = (lead?.statusHistory || [])
+    .map((item: any) => ({
+      ...item,
+      activityType: item.entryType === "details_saved" ? "status-note" : "status-change",
+      text: item.entryType === "details_saved" ? item.details?.note : item.comment,
+      status: item.newStatus,
+      createdAt: item.changedAt || item.createdAt,
+      createdBy: item.changedBy,
+      call: item.call,
+    }))
+    .filter((item: any) => item.text?.trim())
+  const currentDetailsAlreadyRecorded = persistedStatusActivities.some((item: any) =>
+    item.details
+    && item.status === lead?.statusDetails?.status
+    && Math.abs(
+      new Date(item.createdAt).getTime() - new Date(lead?.statusDetails?.savedAt).getTime(),
+    ) < 1000
+  )
+  const currentDetailsActivity = lead?.statusDetails?.savedAt && !currentDetailsAlreadyRecorded
+    ? [{
+        activityType: "status-note",
+        status: lead.statusDetails.status,
+        text: lead.statusDetails.note,
+        createdAt: lead.statusDetails.savedAt,
+        createdBy: lead.statusDetails.savedBy,
+      }]
+    : []
   const globalActivityItems = [
+    ...persistedStatusActivities,
+    ...currentDetailsActivity,
+    ...followUpHistory.map((item) => ({
+      ...item,
+      activityType: "follow-up",
+      text: item.message,
+      createdAt: item.createdAt,
+      createdBy: item.createdBy,
+      status: "Follow Up",
+    })),
     ...(lead?.comments || []).map((item: any) => ({
       ...item,
       activityType: "general-note",
@@ -667,6 +704,14 @@ export default function UnifiedLeadDetails() {
     })),
   ]
     .filter((item: any) => item.text?.trim())
+    .filter((item: any) => !(
+      item.activityType === "status-change"
+      && item.status === "Follow Up"
+      && followUpHistory.some((followUp) =>
+        followUp.message?.trim() === item.text.trim()
+        && Math.abs(new Date(followUp.createdAt).getTime() - new Date(item.createdAt).getTime()) < 60_000
+      )
+    ))
     .sort((left: any, right: any) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
   const hasSavedFollowUp = lead?.followUpRequired === true
     || followUpHistory.some((item) => ["Pending", "Snoozed"].includes(item.status))

@@ -156,7 +156,7 @@ const settingsRoute = createRoute({ getParentRoute: () => protectedRoute, path: 
 const attendanceRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/attendance', component: Attendance, beforeLoad: requireGrant('attendance.view') });
 
 // Tasks Routes
-const tasksRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/tasks', component: Tasks });
+const tasksRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/tasks', component: Tasks, beforeLoad: requireGrant('tasks.view') });
 const calendarRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/calendar', component: Calendar });
 const notesRoute = createRoute({ getParentRoute: () => protectedRoute, path: '/notes', component: Notes });
 

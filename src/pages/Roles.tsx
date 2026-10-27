@@ -182,10 +182,10 @@ export default function Roles() {
                   <Select value={form.level} onValueChange={(level) => setForm({ ...form, level })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Level 2">Level 2 — High</SelectItem>
-                      <SelectItem value="Level 3">Level 3 — Medium</SelectItem>
-                      <SelectItem value="Level 4">Level 4 — Standard</SelectItem>
-                      <SelectItem value="Level 5">Level 5 — Restricted</SelectItem>
+                      <SelectItem value="Level 2">Level 2 — Senior Management / HOD</SelectItem>
+                      <SelectItem value="Level 3">Level 3 — Team Lead / Manager</SelectItem>
+                      <SelectItem value="Level 4">Level 4 — Employee / Developer / Executive</SelectItem>
+                      <SelectItem value="Level 5">Level 5 — Intern / Trainee / Contractor</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
