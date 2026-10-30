@@ -1,4 +1,3 @@
-import { DemoFollowUpFields } from "@/components/leads/DemoFollowUpFields"
 import { useState, useEffect, useRef, type Dispatch, type SetStateAction } from "react"
 import { useParams, useNavigate, useSearch } from "@tanstack/react-router"
 import { useQueryClient } from "@tanstack/react-query"
@@ -39,6 +38,7 @@ const FOLLOW_UP_REMINDERS = [
   { value: "1_hour", label: "1 hour before" },
   { value: "1_day", label: "1 day before" },
 ]
+const REMINDER_STATUSES = new Set(["Follow Up", "Demo follow-up", "Demo Scheduled"])
 
 interface FollowUpForm {
   followUpRequired: boolean
@@ -169,12 +169,10 @@ export default function UnifiedLeadDetails() {
   const [statusDetails, setStatusDetails] = useState<StatusDetailsForm>(() => statusDetailsForm("New"))
   const [savingStatusDetails, setSavingStatusDetails] = useState(false)
   const [selectedStatus, setSelectedStatus] = useState("New")
-  const [commentText, setCommentText] = useState("")
   const [generalNote, setGeneralNote] = useState("")
   const [savingGeneralNote, setSavingGeneralNote] = useState(false)
   const [followUpHistory, setFollowUpHistory] = useState<any[]>([])
   const [attachment, setAttachment] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [messageChannel, setMessageChannel] = useState<"email" | "whatsapp" | null>(null)
   const [availableTemplates, setAvailableTemplates] = useState<any[]>([])
@@ -198,6 +196,9 @@ export default function UnifiedLeadDetails() {
   const canAssignLeads = can(currentUser, "leads.assign")
   const canAddLeadNotes = can(currentUser, "leads.add_note")
   const canManageLeadNotifications = can(currentUser, "leads.manage_notifications")
+  const schedulesActivityReminder = leadType === "Company"
+    && canChangeLeadStatus
+    && REMINDER_STATUSES.has(selectedStatus)
 
   const backToLeadList = () => {
     if (leadType !== "Company") {
@@ -263,6 +264,7 @@ export default function UnifiedLeadDetails() {
       setLead((current: any) => current ? ({
         ...current,
         statusHistory: activity.statusHistory || [],
+        statusComments: activity.statusComments || [],
         messages: activity.messages || [],
         comments: activity.comments || [],
       }) : current)
@@ -278,7 +280,6 @@ export default function UnifiedLeadDetails() {
       const activeFollowUp = response.data?.data?.active
       setFollowUpHistory(response.data?.data?.items || [])
       setFollowUpForm(followUpFormFromLead(activeFollowUp || leadData))
-      setCommentText(activeFollowUp?.message || "")
     } catch (error) {
       console.error("Failed to fetch follow-up history", error)
       setFollowUpForm(followUpFormFromLead(leadData))
@@ -349,7 +350,11 @@ export default function UnifiedLeadDetails() {
   const handleStatusChange = (newStatus: string) => {
     setSelectedStatus(newStatus)
     setStatusDetails(statusDetailsForm(newStatus, lead?.statusDetails))
-    setFollowUpForm((current) => ({ ...current, followUpRequired: newStatus === "Follow Up" }))
+    setFollowUpForm((current) => ({
+      ...current,
+      followUpRequired: REMINDER_STATUSES.has(newStatus),
+      followUpType: newStatus === "Demo follow-up" || newStatus === "Demo Scheduled" ? "Demo" : current.followUpType,
+    }))
   }
 
   const handleNotificationToggle = async (channel: "email" | "whatsapp") => {
@@ -455,14 +460,6 @@ export default function UnifiedLeadDetails() {
       toast.error("Please write comment")
       return
     }
-    if (selectedStatus === "Demo follow-up" && !statusDetails.demoFollowUpDateTime) {
-      toast.error("Select a demo follow-up date and time")
-      return
-    }
-    if (leadType === "Company" && selectedStatus === "Demo Scheduled" && !statusDetails.demoDateTime) {
-      toast.error("Select a demo date and time")
-      return
-    }
     if (leadType === "Company" && selectedStatus === "Not Interested" && !statusDetails.reason) {
       toast.error("Select a reason")
       return
@@ -471,9 +468,14 @@ export default function UnifiedLeadDetails() {
       setSavingStatusDetails(true)
       const response = await api.put(`/leads/unified/${leadType}/${id}/status`, {
         status: selectedStatus,
-        details: selectedStatus === "Demo follow-up"
-          ? { ...statusDetails, demoFollowUpDateTime: new Date(statusDetails.demoFollowUpDateTime).toISOString() }
-          : leadType === "Company" ? statusDetails : { note: comment },
+        details: leadType === "Company"
+          ? {
+              ...statusDetails,
+              ...(statusDetails.demoFollowUpDateTime
+                ? { demoFollowUpDateTime: new Date(statusDetails.demoFollowUpDateTime).toISOString() }
+                : {}),
+            }
+          : { note: comment },
         comment,
       })
       const savedAt = response.data.data?.statusDetails?.savedAt || new Date().toISOString()
@@ -483,22 +485,27 @@ export default function UnifiedLeadDetails() {
         savedBy: currentUser,
         savedAt,
       }
+      const savedCommentEntry = {
+        oldStatus: lead.leadStatus,
+        newStatus: selectedStatus,
+        entryType: lead.leadStatus === selectedStatus ? "details_saved" : "status_change",
+        comment,
+        details: savedDetails,
+        changedBy: currentUser,
+        changedAt: savedAt,
+      }
       setLead((current: any) => ({
         ...current,
         leadStatus: selectedStatus,
         leadStatusChangedAt: response.data.data?.leadStatusChangedAt,
         statusDetails: response.data.data?.statusDetails,
-        statusHistory: [{
-          oldStatus: current.leadStatus,
-          newStatus: selectedStatus,
-          entryType: current.leadStatus === selectedStatus ? "details_saved" : "status_change",
-          comment,
-          details: savedDetails,
-          changedBy: currentUser,
-          changedAt: savedAt,
-        }, ...(current.statusHistory || [])],
+        statusHistory: [savedCommentEntry, ...(current.statusHistory || [])],
+        statusComments: [savedCommentEntry, ...(current.statusComments || [])],
       }))
-      setStatusDetails(statusDetailsForm(selectedStatus, response.data.data?.statusDetails))
+      setStatusDetails({
+        ...statusDetailsForm(selectedStatus, response.data.data?.statusDetails),
+        note: "",
+      })
       window.dispatchEvent(new CustomEvent("follow-up-reminders-refresh"))
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
@@ -518,74 +525,6 @@ export default function UnifiedLeadDetails() {
     window.addEventListener("follow-up-updated", refreshFollowUp)
     return () => window.removeEventListener("follow-up-updated", refreshFollowUp)
   }, [id, leadType])
-
-  const handleSaveFollowUp = async () => {
-    if (!followUpForm.followUpDateTime) {
-      toast.error("Select a follow-up date and time")
-      return
-    }
-    if (!commentText.trim()) {
-      toast.error("Please write comment")
-      return
-    }
-
-    try {
-      setSavingFollowUp(true)
-      if (lead.leadStatus !== "Follow Up") {
-        const statusResponse = await api.put(`/leads/unified/${leadType}/${id}/status`, {
-          status: "Follow Up",
-          comment: commentText.trim(),
-        })
-        setLead((current: any) => ({
-          ...current,
-          leadStatus: "Follow Up",
-          leadStatusChangedAt: statusResponse.data.data?.leadStatusChangedAt,
-          statusHistory: [{
-            oldStatus: current.leadStatus,
-            newStatus: "Follow Up",
-            entryType: "status_change",
-            comment: commentText.trim(),
-            changedBy: currentUser,
-            changedAt: statusResponse.data.data?.leadStatusChangedAt || new Date().toISOString(),
-          }, ...(current.statusHistory || [])],
-        }))
-      }
-      const formData = new FormData()
-      formData.append("followUpRequired", "true")
-      formData.append("message", commentText.trim())
-      formData.append("followUpDateTime", new Date(followUpForm.followUpDateTime).toISOString())
-      formData.append("followUpType", followUpForm.followUpType)
-      formData.append("followUpPriority", followUpForm.followUpPriority)
-      formData.append("followUpReminder", followUpForm.followUpReminder)
-      if (attachment) formData.append("attachment", attachment)
-      const response = await api.post(`/follow-ups/lead/${id}`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
-      const savedFollowUp = response.data.data?.followUp
-      setLead((current: any) => ({
-        ...current,
-        followUpRequired: Boolean(savedFollowUp),
-        followUpDateTime: savedFollowUp?.followUpDateTime || null,
-        followUpType: savedFollowUp?.type || null,
-        followUpPriority: savedFollowUp?.priority || null,
-        followUpReminder: savedFollowUp?.reminderBefore || null,
-      }))
-      setFollowUpForm(followUpFormFromLead(savedFollowUp))
-      if (!savedFollowUp) setCommentText("")
-      removeAttachment()
-      const historyResponse = await api.get(`/follow-ups/lead/${id}`)
-      setFollowUpHistory(historyResponse.data.data?.items || [])
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
-        queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
-      ])
-      toast.success(response.data.message || "Follow-up saved successfully")
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to save follow-up")
-    } finally {
-      setSavingFollowUp(false)
-    }
-  }
 
   const handleAssignChange = async (userId: string) => {
     try {
@@ -610,6 +549,72 @@ export default function UnifiedLeadDetails() {
     }
     try {
       setSavingGeneralNote(true)
+      if (schedulesActivityReminder) {
+        if (selectedStatus !== lead.leadStatus) {
+          toast.error(`Save ${selectedStatus} status first`)
+          return
+        }
+        if (!followUpForm.followUpDateTime) {
+          toast.error("Select a follow-up date and time")
+          return
+        }
+        setSavingFollowUp(true)
+        const formData = new FormData()
+        formData.append("followUpRequired", "true")
+        formData.append("sourceStatus", selectedStatus)
+        formData.append("message", text)
+        formData.append("followUpDateTime", new Date(followUpForm.followUpDateTime).toISOString())
+        formData.append("followUpType", followUpForm.followUpType)
+        formData.append("followUpPriority", followUpForm.followUpPriority)
+        formData.append("followUpReminder", followUpForm.followUpReminder)
+        if (attachment) formData.append("attachment", attachment)
+        const response = await api.post(`/follow-ups/lead/${id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        })
+        const savedFollowUp = response.data.data?.followUp
+        const schedule = response.data.data?.schedule
+        setFollowUpHistory((current) => [
+          { ...savedFollowUp, createdBy: currentUser },
+          ...current.filter((item) => item._id !== savedFollowUp?._id),
+        ])
+        setLead((current: any) => ({
+          ...current,
+          followUpRequired: true,
+          followUpDateTime: savedFollowUp?.followUpDateTime,
+          followUpType: savedFollowUp?.type,
+          followUpPriority: savedFollowUp?.priority,
+          followUpReminder: savedFollowUp?.reminderBefore,
+          statusDetails: schedule?.status === "Demo follow-up"
+            ? { ...current.statusDetails, demoFollowUpDateTime: schedule.followUpDateTime, reminder: schedule.reminder }
+            : schedule?.status === "Demo Scheduled"
+              ? { ...current.statusDetails, demoDateTime: schedule.followUpDateTime, reminder: schedule.reminder }
+              : current.statusDetails,
+        }))
+        if (schedule?.status === "Demo follow-up") {
+          setStatusDetails((current) => ({
+            ...current,
+            demoFollowUpDateTime: dateTimeInputValue(new Date(schedule.followUpDateTime)),
+            reminder: schedule.reminder,
+          }))
+        } else if (schedule?.status === "Demo Scheduled") {
+          setStatusDetails((current) => ({
+            ...current,
+            demoDateTime: dateTimeInputValue(new Date(schedule.followUpDateTime)),
+            reminder: schedule.reminder,
+          }))
+        }
+        setFollowUpForm(followUpFormFromLead(savedFollowUp))
+        setGeneralNote("")
+        removeAttachment()
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["paged", "/companies/paged"] }),
+          queryClient.invalidateQueries({ queryKey: ["leads", "stats"] }),
+          queryClient.invalidateQueries({ queryKey: ["dashboard", "metrics"] }),
+        ])
+        window.dispatchEvent(new CustomEvent("follow-up-reminders-refresh"))
+        toast.success("Follow-up and reminder saved successfully")
+        return
+      }
       const response = await api.post(`/leads/unified/${leadType}/${id}/comment`, { text })
       setLead((current: any) => ({
         ...current,
@@ -621,6 +626,7 @@ export default function UnifiedLeadDetails() {
       toast.error(err.response?.data?.message || "Failed to add note")
     } finally {
       setSavingGeneralNote(false)
+      setSavingFollowUp(false)
     }
   }
 
@@ -632,16 +638,11 @@ export default function UnifiedLeadDetails() {
         return
       }
       setAttachment(file)
-      setPreviewUrl(URL.createObjectURL(file))
     }
   }
 
   const removeAttachment = () => {
     setAttachment(null)
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl)
-      setPreviewUrl(null)
-    }
   }
 
   const assignedUsers = Array.isArray(lead?.assignedTo)
@@ -654,67 +655,24 @@ export default function UnifiedLeadDetails() {
     ? assignedUsers.map((user: any) => user?.name || "Unknown").join(", ")
     : "-"
 
-  const persistedStatusActivities = (lead?.statusHistory || [])
-    .map((item: any) => ({
-      ...item,
-      activityType: item.entryType === "details_saved" ? "status-note" : "status-change",
-      text: item.entryType === "details_saved" ? item.details?.note : item.comment,
-      status: item.newStatus,
-      createdAt: item.changedAt || item.createdAt,
-      createdBy: item.changedBy,
-      call: item.call,
-    }))
-    .filter((item: any) => item.text?.trim())
-  const currentDetailsAlreadyRecorded = persistedStatusActivities.some((item: any) =>
-    item.details
-    && item.status === lead?.statusDetails?.status
-    && Math.abs(
-      new Date(item.createdAt).getTime() - new Date(lead?.statusDetails?.savedAt).getTime(),
-    ) < 1000
-  )
-  const currentDetailsActivity = lead?.statusDetails?.savedAt && !currentDetailsAlreadyRecorded
-    ? [{
-        activityType: "status-note",
-        status: lead.statusDetails.status,
-        text: lead.statusDetails.note,
-        createdAt: lead.statusDetails.savedAt,
-        createdBy: lead.statusDetails.savedBy,
-      }]
-    : []
   const globalActivityItems = [
-    ...persistedStatusActivities,
-    ...currentDetailsActivity,
     ...followUpHistory.map((item) => ({
       ...item,
       activityType: "follow-up",
       text: item.message,
       createdAt: item.createdAt,
       createdBy: item.createdBy,
-      status: "Follow Up",
+      status: item.sourceStatus || "Follow Up",
     })),
     ...(lead?.comments || []).map((item: any) => ({
       ...item,
       activityType: "general-note",
     })),
-    ...(lead?.messages || []).map((item: any) => ({
-      ...item,
-      activityType: "lead-message",
-      text: `${item.channel === "email" ? "Email" : "WhatsApp"} ${item.status}: ${item.templateName}`,
-      status: item.channel === "email" ? "Email" : "WhatsApp",
-    })),
   ]
     .filter((item: any) => item.text?.trim())
-    .filter((item: any) => !(
-      item.activityType === "status-change"
-      && item.status === "Follow Up"
-      && followUpHistory.some((followUp) =>
-        followUp.message?.trim() === item.text.trim()
-        && Math.abs(new Date(followUp.createdAt).getTime() - new Date(item.createdAt).getTime()) < 60_000
-      )
-    ))
     .sort((left: any, right: any) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime())
-  const hasSavedFollowUp = lead?.followUpRequired === true
-    || followUpHistory.some((item) => ["Pending", "Snoozed"].includes(item.status))
+  const selectedStatusComments = (lead?.statusComments || [])
+    .filter((item: any) => item.newStatus === selectedStatus && item.comment?.trim())
   const hasSavedStatusDetails = lead?.statusDetails?.status === selectedStatus
     && Boolean(lead.statusDetails.savedAt)
 
@@ -888,145 +846,14 @@ export default function UnifiedLeadDetails() {
 
               </div>
 
-              {canChangeLeadStatus && leadType === "Company" && selectedStatus === "Follow Up" && (
-                <div className="grid gap-4 border-t pt-5 lg:grid-cols-2 lg:gap-x-6">
-                  <div className="lg:col-span-2">
-                    <p className="text-sm font-semibold">Follow-up & Message</p>
-                    <p className="text-xs text-muted-foreground">Schedule the next action and add its reminder message.</p>
-                  </div>
-
-                  <>
-                      <div className="flex flex-col gap-2 lg:col-start-2 lg:row-span-4 lg:row-start-2 lg:border-l lg:pl-6">
-                        <label htmlFor="follow-up-message" className="text-xs font-semibold text-muted-foreground">
-                          Follow-up Message
-                        </label>
-                        <div className="relative">
-                          <Textarea
-                            id="follow-up-message"
-                            rows={3}
-                            maxLength={4000}
-                            placeholder="Add a message for this follow-up..."
-                            value={commentText}
-                            onChange={(event) => setCommentText(event.target.value)}
-                            className="min-h-[84px] resize-y pr-11 text-sm"
-                            disabled={savingFollowUp}
-                          />
-                          <input
-                            type="file"
-                            id="follow-up-file-upload"
-                            className="hidden"
-                            accept="image/*,video/*"
-                            onChange={handleFileSelect}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="absolute bottom-2 right-2 h-7 w-7 text-muted-foreground"
-                            onClick={() => document.getElementById("follow-up-file-upload")?.click()}
-                            disabled={savingFollowUp}
-                            aria-label="Attach a file"
-                          >
-                            <Paperclip className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        {attachment && (
-                          <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2">
-                            <span className="min-w-0 truncate text-xs">{attachment.name}</span>
-                            <Button type="button" variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={removeAttachment}>
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        )}
-                        {attachment && previewUrl && (
-                          <div className="relative w-fit overflow-hidden rounded-md border">
-                            {attachment.type.startsWith("video/") ? (
-                              <video src={previewUrl} className="h-20 max-w-[220px] bg-black object-cover" />
-                            ) : (
-                              <img src={previewUrl} alt="Follow-up attachment preview" className="h-20 max-w-[220px] object-cover" />
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex flex-col gap-1.5 lg:col-start-1">
-                        <label htmlFor="follow-up-date-time" className="text-xs font-semibold text-muted-foreground">
-                          Follow-up Date & Time
-                        </label>
-                        <Input
-                          id="follow-up-date-time"
-                          type="datetime-local"
-                          step={60}
-                          min={dateTimeInputValue(new Date())}
-                          value={followUpForm.followUpDateTime}
-                          onChange={(event) => setFollowUpForm((current) => ({
-                            ...current,
-                            followUpDateTime: event.target.value,
-                          }))}
-                          disabled={savingFollowUp}
-                          required
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5 lg:col-start-1">
-                        <label className="text-xs font-semibold text-muted-foreground">Follow-up Type</label>
-                        <Select
-                          value={followUpForm.followUpType}
-                          onValueChange={(value) => setFollowUpForm((current) => ({ ...current, followUpType: value }))}
-                          disabled={savingFollowUp}
-                        >
-                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {FOLLOW_UP_TYPES.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 lg:col-start-1">
-                        <div className="flex min-w-0 flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-muted-foreground">Priority</label>
-                          <Select
-                            value={followUpForm.followUpPriority}
-                            onValueChange={(value) => setFollowUpForm((current) => ({ ...current, followUpPriority: value }))}
-                            disabled={savingFollowUp}
-                          >
-                            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {FOLLOW_UP_PRIORITIES.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="flex min-w-0 flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-muted-foreground">Reminder</label>
-                          <Select
-                            value={followUpForm.followUpReminder}
-                            onValueChange={(value) => setFollowUpForm((current) => ({ ...current, followUpReminder: value }))}
-                            disabled={savingFollowUp}
-                          >
-                            <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {FOLLOW_UP_REMINDERS.map((item) => (
-                                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                  </>
-
-                  <Button className="w-fit justify-self-end px-5 lg:col-span-2" onClick={handleSaveFollowUp} disabled={savingFollowUp}>
-                    {savingFollowUp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    {hasSavedFollowUp ? "Update Follow-up" : "Save Follow-up"}
-                  </Button>
-                </div>
-              )}
-              {canChangeLeadStatus && (leadType === "Company" || selectedStatus === "Demo follow-up") && selectedStatus !== "Follow Up" && (
+              {canChangeLeadStatus && (leadType === "Company" || selectedStatus === "Demo follow-up") && (
                 <StatusDetailsPanel
                   status={selectedStatus}
                   details={statusDetails}
                   setDetails={setStatusDetails}
                   saving={savingStatusDetails}
                   isSaved={hasSavedStatusDetails}
+                  savedComments={selectedStatusComments}
                   onSave={handleSaveStatusDetails}
                 />
               )}
@@ -1037,6 +864,7 @@ export default function UnifiedLeadDetails() {
                   onNoteChange={(note) => setStatusDetails((current) => ({ ...current, note }))}
                   saving={savingStatusDetails}
                   isSaved={hasSavedStatusDetails}
+                  savedComments={selectedStatusComments}
                   onSave={handleSaveStatusDetails}
                 />
               )}
@@ -1078,9 +906,6 @@ export default function UnifiedLeadDetails() {
                         <div className="flex flex-wrap items-center gap-2">
                           {item.activityType !== "general-note" && (
                             <Badge variant="outline" className="bg-background/70">{item.status}</Badge>
-                          )}
-                          {item.activityType === "follow-up" && (
-                            <span className="text-[11px] font-medium text-muted-foreground">Follow-up</span>
                           )}
                         </div>
 
@@ -1163,31 +988,109 @@ export default function UnifiedLeadDetails() {
             )}
           </div>
           {canAddLeadNotes && (
-          <div className="flex items-end gap-2 border-t bg-background p-3">
-            <Textarea
-              value={generalNote}
-              onChange={(event) => setGeneralNote(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault()
-                  if (generalNote.trim() && !savingGeneralNote) void handleAddGeneralNote()
-                }
-              }}
-              placeholder="Type a note..."
-              maxLength={4000}
-              rows={3}
-              className="max-h-40 min-h-24 resize-y rounded-2xl"
-              disabled={savingGeneralNote}
-            />
-            <Button
-              size="icon"
-              className="h-11 w-11 shrink-0 rounded-full"
-              onClick={handleAddGeneralNote}
-              disabled={savingGeneralNote || !generalNote.trim()}
-              aria-label="Add note"
-            >
-              {savingGeneralNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
-            </Button>
+          <div className="space-y-3 border-t bg-background p-3">
+            {schedulesActivityReminder && (
+              <div className="grid gap-3 rounded-xl border bg-muted/20 p-3 md:grid-cols-2 lg:grid-cols-4">
+                <Field label={`${selectedStatus === "Demo Scheduled" ? "Demo" : "Follow-up"} Date & Time`}>
+                  <Input
+                    type="datetime-local"
+                    step={60}
+                    min={dateTimeInputValue(new Date())}
+                    value={followUpForm.followUpDateTime}
+                    onChange={(event) => setFollowUpForm((current) => ({ ...current, followUpDateTime: event.target.value }))}
+                    disabled={savingGeneralNote}
+                  />
+                </Field>
+                <Field label="Follow-up Type">
+                  <Select
+                    value={followUpForm.followUpType}
+                    onValueChange={(value) => setFollowUpForm((current) => ({ ...current, followUpType: value }))}
+                    disabled={savingGeneralNote}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FOLLOW_UP_TYPES.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Priority">
+                  <Select
+                    value={followUpForm.followUpPriority}
+                    onValueChange={(value) => setFollowUpForm((current) => ({ ...current, followUpPriority: value }))}
+                    disabled={savingGeneralNote}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FOLLOW_UP_PRIORITIES.map((value) => <SelectItem key={value} value={value}>{value}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Reminder">
+                  <Select
+                    value={followUpForm.followUpReminder}
+                    onValueChange={(value) => setFollowUpForm((current) => ({ ...current, followUpReminder: value }))}
+                    disabled={savingGeneralNote}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FOLLOW_UP_REMINDERS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+            )}
+            <div className="flex items-end gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Textarea
+                  value={generalNote}
+                  onChange={(event) => setGeneralNote(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault()
+                      if (generalNote.trim() && !savingGeneralNote) void handleAddGeneralNote()
+                    }
+                  }}
+                  placeholder={schedulesActivityReminder ? "Type the follow-up note..." : "Type a note..."}
+                  maxLength={4000}
+                  rows={3}
+                  className="max-h-40 min-h-24 resize-y rounded-2xl pr-12"
+                  disabled={savingGeneralNote}
+                />
+                {schedulesActivityReminder && (
+                  <>
+                    <input id="activity-follow-up-file" type="file" className="hidden" accept="image/*,video/*" onChange={handleFileSelect} />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute bottom-2 right-2 h-8 w-8 text-muted-foreground"
+                      onClick={() => document.getElementById("activity-follow-up-file")?.click()}
+                      disabled={savingGeneralNote}
+                      aria-label="Attach a file"
+                    >
+                      <Paperclip className="h-4 w-4" />
+                    </Button>
+                  </>
+                )}
+              </div>
+              <Button
+                size="icon"
+                className="h-11 w-11 shrink-0 rounded-full"
+                onClick={handleAddGeneralNote}
+                disabled={savingGeneralNote || !generalNote.trim()}
+                aria-label="Add note"
+              >
+                {savingGeneralNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+              </Button>
+            </div>
+            {attachment && schedulesActivityReminder && (
+              <div className="flex items-center justify-between gap-3 rounded-md border bg-muted/30 px-3 py-2">
+                <span className="min-w-0 truncate text-xs">{attachment.name}</span>
+                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={removeAttachment}>
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
           </div>
           )}
         </CardContent>
@@ -1565,6 +1468,7 @@ function SimpleStatusNotePanel({
   onNoteChange,
   saving,
   isSaved,
+  savedComments,
   onSave,
 }: {
   status: string
@@ -1572,6 +1476,7 @@ function SimpleStatusNotePanel({
   onNoteChange: (note: string) => void
   saving: boolean
   isSaved: boolean
+  savedComments: any[]
   onSave: () => void
 }) {
   return (
@@ -1580,15 +1485,18 @@ function SimpleStatusNotePanel({
         <p className="text-sm font-semibold">{status} Details</p>
         <p className="text-xs text-muted-foreground">Add a comment before saving this lead status.</p>
       </div>
-      <Field label={`${status} Note`}>
-        <Textarea
-          value={note}
-          onChange={(event) => onNoteChange(event.target.value)}
-          placeholder="Add relevant details..."
-          className="min-h-[76px]"
-          disabled={saving}
-        />
-      </Field>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label={`${status} Note`}>
+          <Textarea
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+            placeholder="Add relevant details..."
+            className="min-h-[180px] resize-y"
+            disabled={saving}
+          />
+        </Field>
+        <SavedStatusComments comments={savedComments} />
+      </div>
       <div className="flex justify-end">
         <Button className="w-fit px-5" onClick={onSave} disabled={saving}>
           {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -1605,6 +1513,7 @@ function StatusDetailsPanel({
   setDetails,
   saving,
   isSaved,
+  savedComments,
   onSave,
 }: {
   status: string
@@ -1612,6 +1521,7 @@ function StatusDetailsPanel({
   setDetails: Dispatch<SetStateAction<StatusDetailsForm>>
   saving: boolean
   isSaved: boolean
+  savedComments: any[]
   onSave: () => void
 }) {
   const update = (field: keyof StatusDetailsForm, value: string) => {
@@ -1626,6 +1536,37 @@ function StatusDetailsPanel({
     Converted: "Conversion / Payment Details",
   }
 
+  if (status === "Demo follow-up") {
+    return (
+      <div className="space-y-4 border-t pt-5">
+        <div className="grid items-start gap-4 md:grid-cols-2">
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold">Demo follow-up Details</p>
+              <p className="text-xs text-muted-foreground">Save the information relevant to the selected lead status.</p>
+            </div>
+            <Field label="Demo follow-up Note">
+              <Textarea
+                value={details.note}
+                onChange={(event) => update("note", event.target.value)}
+                placeholder="Add relevant details..."
+                className="min-h-[96px] resize-y"
+                disabled={saving}
+              />
+            </Field>
+            <div className="flex justify-end">
+              <Button className="w-fit px-5" onClick={onSave} disabled={saving}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isSaved ? "Update" : "Save"} {status}
+              </Button>
+            </div>
+          </div>
+          <SavedStatusComments comments={savedComments} tall />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4 border-t pt-5">
       <div>
@@ -1633,13 +1574,8 @@ function StatusDetailsPanel({
         <p className="text-xs text-muted-foreground">Save the information relevant to the selected lead status.</p>
       </div>
 
-      {status === "Demo follow-up" && <DemoFollowUpFields value={details.demoFollowUpDateTime} onChange={(value) => update("demoFollowUpDateTime", value)} reminder={details.reminder} onReminderChange={(value) => update("reminder", value)} disabled={saving} />}
-
       {status === "Demo Scheduled" && (
         <div className="grid gap-4 md:grid-cols-2">
-          <Field label="Demo Date & Time">
-            <Input type="datetime-local" value={details.demoDateTime} onChange={(event) => update("demoDateTime", event.target.value)} disabled={saving} />
-          </Field>
           <Field label="Demo Mode">
             <Select value={details.demoMode} onValueChange={(value) => update("demoMode", value)} disabled={saving}>
               <SelectTrigger><SelectValue /></SelectTrigger>
@@ -1658,14 +1594,6 @@ function StatusDetailsPanel({
               <Input value={details.location} onChange={(event) => update("location", event.target.value)} placeholder="Meeting location" disabled={saving} />
             </Field>
           )}
-          <Field label="Reminder">
-            <Select value={details.reminder} onValueChange={(value) => update("reminder", value)} disabled={saving}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {FOLLOW_UP_REMINDERS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </Field>
         </div>
       )}
 
@@ -1721,15 +1649,18 @@ function StatusDetailsPanel({
         </div>
       )}
 
-      <Field label={status === "New" ? "Initial Note" : `${status} Note`}>
-        <Textarea
-          value={details.note}
-          onChange={(event) => update("note", event.target.value)}
-          placeholder="Add relevant details..."
-          className="min-h-[76px]"
-          disabled={saving}
-        />
-      </Field>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Field label={status === "New" ? "Initial Note" : `${status} Note`}>
+          <Textarea
+            value={details.note}
+            onChange={(event) => update("note", event.target.value)}
+            placeholder="Add relevant details..."
+            className="min-h-[180px] resize-y"
+            disabled={saving}
+          />
+        </Field>
+        <SavedStatusComments comments={savedComments} />
+      </div>
 
       <div className="flex justify-end">
         <Button className="w-fit px-5" onClick={onSave} disabled={saving}>
@@ -1738,6 +1669,29 @@ function StatusDetailsPanel({
         </Button>
       </div>
     </div>
+  )
+}
+
+function SavedStatusComments({ comments, tall = false }: { comments: any[]; tall?: boolean }) {
+  return (
+    <Field label="Saved Comments">
+      <div className={`${tall ? "h-[236px]" : "h-[180px]"} overflow-y-auto rounded-md border bg-muted/30 px-3 py-2 text-sm`}>
+        {comments.length === 0 ? (
+          <p className="text-muted-foreground">No saved comments yet.</p>
+        ) : (
+          <div className="divide-y">
+            {comments.map((item, index) => (
+              <div key={item._id || `${item.changedAt}-${index}`} className="space-y-1 py-2 first:pt-0">
+                <p className="whitespace-pre-wrap break-words">{item.comment}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {item.changedBy?.name || "User"} • {new Date(item.changedAt || item.createdAt).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Field>
   )
 }
 
