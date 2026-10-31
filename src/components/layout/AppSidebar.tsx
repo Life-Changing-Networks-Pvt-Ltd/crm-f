@@ -18,7 +18,9 @@ import {
   Bell,
   ClipboardList,
   Clock,
-  PhoneCall
+  PhoneCall,
+  ExternalLink,
+  PanelsTopLeft,
 } from "lucide-react"
 import { Share2, Building2 } from "lucide-react"
 
@@ -37,8 +39,10 @@ import {
 import { Link as RouterLink, useLocation } from "@tanstack/react-router"
 import { useSelector } from "react-redux"
 import type { RootState } from "@/store"
-import { canOpenPage } from "@/lib/accessControl"
+import { canOpenPage, isAdmin } from "@/lib/accessControl"
 import { prefetchPageData } from "@/lib/pagePrefetch"
+
+const sellersloginEmsUrl = String(import.meta.env.VITE_SELLERSLOGIN_EMS_URL || "http://localhost:3000/dashboard").replace(/\/$/, "")
 
 const navItems = [
   {
@@ -169,6 +173,21 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
+                {group.title === "CRM" && isAdmin(user) && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip="Sellerslogin EMS"
+                      className="rounded-xl text-[#374151] transition-colors duration-200 hover:bg-[#FFF3E3] hover:text-[#A85F08] focus-visible:ring-[#C97816] active:bg-[#FFE8CC] active:text-[#A85F08]"
+                    >
+                      <a href={sellersloginEmsUrl} aria-label="Open Sellerslogin EMS">
+                        <PanelsTopLeft />
+                        <span>Sellerslogin EMS</span>
+                        <ExternalLink className="ml-auto h-3.5 w-3.5 opacity-60" />
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
